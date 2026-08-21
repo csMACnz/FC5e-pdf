@@ -51,12 +51,18 @@ const SKILLS_MASTER = [
         });
 
         document.getElementById('loadSampleBtn').addEventListener('click', loadSampleCharacter);
-        document.getElementById('printBtn').addEventListener('click', () => window.print());
+        document.getElementById('printBtn').addEventListener('click', () => { if (!document.getElementById('printBtn').disabled) window.print(); });
 
         function processFile(file) {
             const reader = new FileReader();
             reader.onload = (e) => parseFC5XML(e.target.result, file.name);
             reader.readAsText(file);
+        }
+
+        function showData() {
+            document.getElementById('uploadPlaceholder').classList.add('hidden');
+            document.getElementById('sheetsWrapper').classList.remove('hidden');
+            document.getElementById('printBtn').disabled = false;
         }
 
         function showStatus(msg) {
@@ -362,6 +368,7 @@ const SKILLS_MASTER = [
                 renderSpells(charNode, statsMap, profBonusNum);
 
                 showStatus(`Successfully imported character: "${name}" (${document.getElementById('charClass').value})`);
+                showData();
 
             } catch (err) {
                 console.error(err);
@@ -614,6 +621,121 @@ const SKILLS_MASTER = [
         }
 
         function loadSampleCharacter() {
-            // Re-runs default state
-            showStatus("Loaded default demo sheet.");
+            const name = "Seraphina Dawnveil";
+            const statsMap = { str: 8, dex: 14, con: 12, int: 18, wis: 14, cha: 13 };
+            const profBonusNum = 3; // level 5
+            const totalLevel = 5;
+
+            // Core fields
+            document.getElementById('charName').value = name;
+            document.getElementById('p2CharName').textContent = name;
+            document.getElementById('p3CharName').textContent = name;
+            document.getElementById('charClass').value = "Wizard 5";
+            document.getElementById('charBackground').value = "Sage";
+            document.getElementById('charRace').value = "Half-Elf";
+            document.getElementById('charAlignment').value = "Neutral Good";
+            document.getElementById('profBonus').value = `+${profBonusNum}`;
+
+            // Ability scores & mods
+            STATS_MASTER.forEach(s => {
+                document.getElementById(`score-${s}`).value = statsMap[s];
+                document.getElementById(`mod-${s}`).textContent = calcMod(statsMap[s]);
+            });
+
+            // Combat stats
+            document.getElementById('acVal').value = "13";
+            document.getElementById('initVal').value = "+2";
+            document.getElementById('speedVal').value = "30 ft";
+            document.getElementById('hpMax').value = "31";
+            document.getElementById('hpCurrent').value = "31";
+            document.getElementById('hpTemp').value = "0";
+            document.getElementById('hitDice').value = "5d6";
+            document.getElementById('passivePerception').value = "14";
+
+            // Saves — INT and WIS proficient
+            renderSaves(["int", "wis"], statsMap, profBonusNum);
+
+            // Skills — Arcana, History, Insight, Perception, Investigation proficient
+            renderSkills(new Set(["arcana", "history", "insight", "perception", "investigation"]), statsMap, profBonusNum);
+
+            // Weapons
+            const tbody = document.getElementById('weaponsTable');
+            tbody.innerHTML = '';
+            [
+                { name: "Quarterstaff", atkBonus: "+2", dmg: "1d6-1 bludgeoning" },
+                { name: "Fire Bolt (cantrip)", atkBonus: "+7", dmg: "2d10 fire" },
+                { name: "Dagger", atkBonus: "+5", dmg: "1d4+2 piercing" },
+            ].forEach(w => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-zinc-200";
+                const nameCell = document.createElement('td'); nameCell.className = "p-1 font-bold"; nameCell.textContent = w.name;
+                const atkCell = document.createElement('td'); atkCell.className = "p-1 font-bold text-center text-red-900"; atkCell.textContent = w.atkBonus;
+                const dmgCell = document.createElement('td'); dmgCell.className = "p-1 text-zinc-700"; dmgCell.textContent = w.dmg;
+                tr.append(nameCell, atkCell, dmgCell);
+                tbody.appendChild(tr);
+            });
+            document.getElementById('attackNotes').value = "Arcane Focus (crystal orb) used as spellcasting focus.";
+
+            // Proficiencies & Equipment
+            document.getElementById('profLanguages').value = "Armor: None\nWeapons: Daggers, Darts, Slings, Quarterstaffs, Light Crossbows\nLanguages: Common, Elvish, Draconic, Sylvan\nTools: None";
+            document.getElementById('equipmentList').value = "Quarterstaff, Crystal Orb (arcane focus), Dagger, Scholar's Pack, Spellbook, 35 gp";
+
+            // Features
+            const featuresContainer = document.getElementById('featuresContainer');
+            featuresContainer.innerHTML = '';
+            [
+                { name: "Arcane Recovery", text: "Once per day when you finish a short rest, you can choose expended spell slots to recover. The spell slots can have a combined level equal to or less than half your wizard level (rounded up)." },
+                { name: "Spellcasting", text: "INT is your spellcasting ability. Spell save DC 15, Spell attack bonus +7. You can cast spells from your spellbook and prepare INT mod + wizard level spells per day." },
+                { name: "School of Evocation: Sculpt Spells", text: "When you cast an evocation spell that affects other creatures, you can protect up to INT mod (4) of them from harm, choosing them to automatically succeed on saving throws and take no damage." },
+                { name: "School of Evocation: Potent Cantrip", text: "Starting at 6th level, your damaging cantrips affect even creatures that avoid the brunt of the effect. (Not yet active.)" },
+                { name: "Darkvision (Half-Elf)", text: "You can see in dim light within 60 feet as if it were bright light, and in darkness as if it were dim light." },
+                { name: "Fey Ancestry", text: "You have advantage on saving throws against being charmed, and magic can't put you to sleep." },
+                { name: "Skill Versatility", text: "You gain proficiency in two skills of your choice: Insight and Perception." },
+                { name: "Researcher (Sage)", text: "When you attempt to learn or recall a piece of lore, if you don't know the information, you often know where to find it." },
+            ].forEach(({ name: fName, text }) => {
+                const div = document.createElement('div');
+                div.className = "border-b border-zinc-200 pb-1.5";
+                const nameEl = document.createElement('span'); nameEl.className = "font-bold text-red-900"; nameEl.textContent = `${fName}: `;
+                const textEl = document.createElement('span'); textEl.className = "text-zinc-700"; textEl.textContent = text;
+                div.append(nameEl, textEl);
+                featuresContainer.appendChild(div);
+            });
+
+            // Bio
+            document.getElementById('personality').value = "I'm lost in the pages of my spellbook more often than not. Theoretical debates excite me far more than small talk.";
+            document.getElementById('ideals').value = "Knowledge. The path to power and self-improvement is through knowledge. (Neutral)";
+            document.getElementById('bonds').value = "I am writing a grand treatise on the nature of arcane magic, and I need to finish it before I die.";
+            document.getElementById('flaws').value = "I speak without thinking, bluntly stating what others consider uncomfortable truths.";
+
+            // Spells
+            document.getElementById('spellAbility').value = "INT";
+            document.getElementById('spellSaveDC').value = "15";
+            document.getElementById('spellAttackBonus').value = "+7";
+            document.getElementById('slots1').textContent = "Slots: [ ] [ ] [ ] [ ]";
+            document.getElementById('slots2').textContent = "Slots: [ ] [ ] [ ]";
+            document.getElementById('slots3').textContent = "Slots: [ ] [ ]";
+            document.getElementById('slots4').textContent = "Slots: (none)";
+
+            [
+                { id: 'spells0', spells: ["Fire Bolt", "Mage Hand", "Prestidigitation", "Minor Illusion"] },
+                { id: 'spells1', spells: ["Magic Missile", "Shield", "Thunderwave", "Identify", "Detect Magic"] },
+                { id: 'spells2', spells: ["Misty Step", "Shatter", "Scorching Ray", "Mirror Image"] },
+                { id: 'spells3', spells: ["Fireball", "Counterspell", "Fly"] },
+            ].forEach(({ id, spells }) => {
+                const container = document.getElementById(id);
+                container.innerHTML = '';
+                spells.forEach(sName => {
+                    const div = document.createElement('div');
+                    div.className = "flex items-center justify-between border-b border-zinc-100 py-0.5";
+                    const textWrap = document.createElement('span');
+                    const bubble = document.createElement('span'); bubble.className = "bubble";
+                    textWrap.append(bubble, document.createTextNode(sName));
+                    div.appendChild(textWrap);
+                    container.appendChild(div);
+                });
+            });
+            document.getElementById('spellsHigher').innerHTML = '';
+
+            showStatus("Loaded demo character: Seraphina Dawnveil (Wizard 5).");
+            showData();
         }

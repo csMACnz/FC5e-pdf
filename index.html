@@ -36,7 +36,7 @@
                 </button>
 
                 <!-- Print Button -->
-                <button id="printBtn" class="bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow transition flex items-center gap-2">
+                <button id="printBtn" disabled class="bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow transition flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
                     Print / Save to PDF
                 </button>
@@ -52,23 +52,33 @@
 
     <!-- Main Printable Sheets -->
     <main id="sheetContainer" class="w-full max-w-5xl">
-        
+
+        <!-- Placeholder -->
+        <div id="uploadPlaceholder" class="no-print flex flex-col items-center justify-center py-24 text-center text-zinc-400">
+            <svg class="w-16 h-16 mb-4 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+            <p class="text-xl font-semibold mb-2">Upload a Fight Club 5e XML file to get started</p>
+            <p class="text-sm text-zinc-500">Drag &amp; drop a <code class="text-amber-400">.xml</code> file anywhere, click <strong>Upload or Drop FC5 XML</strong>, or try <strong>Load Demo Character</strong>.</p>
+        </div>
+
+        <!-- Pages (hidden until data loads) -->
+        <div id="sheetsWrapper" class="hidden">
+
         <!-- PAGE 1: Combat & Core Stats -->
         <div class="sheet-page flex flex-col justify-between" id="page1">
             <!-- Header Block -->
             <div class="border-2 border-zinc-800 p-3 rounded-lg mb-3 flex flex-wrap md:flex-nowrap justify-between items-center gap-4 bg-stone-50">
                 <div class="w-full md:w-1/3">
                     <label class="block text-[8px] font-bold text-zinc-500 uppercase tracking-wider">Character Name</label>
-                    <input type="text" id="charName" class="w-full text-2xl font-black dnd-font bg-transparent border-b border-zinc-300 focus:outline-none text-red-900" value="Monty">
+                    <input type="text" id="charName" class="w-full text-2xl font-black dnd-font bg-transparent border-b border-zinc-300 focus:outline-none text-red-900" value="">
                 </div>
                 <div class="w-full md:w-2/3 grid grid-cols-3 gap-2 text-xs">
                     <div>
                         <span class="block text-[8px] font-bold text-zinc-500 uppercase">Class & Level</span>
-                        <input type="text" id="charClass" class="w-full font-semibold bg-transparent border-b border-zinc-300 focus:outline-none" value="Ranger 2">
+                        <input type="text" id="charClass" class="w-full font-semibold bg-transparent border-b border-zinc-300 focus:outline-none" value="">
                     </div>
                     <div>
                         <span class="block text-[8px] font-bold text-zinc-500 uppercase">Background</span>
-                        <input type="text" id="charBackground" class="w-full font-semibold bg-transparent border-b border-zinc-300 focus:outline-none" value="Outlander">
+                        <input type="text" id="charBackground" class="w-full font-semibold bg-transparent border-b border-zinc-300 focus:outline-none" value="">
                     </div>
                     <div>
                         <span class="block text-[8px] font-bold text-zinc-500 uppercase">Player Name</span>
@@ -76,15 +86,15 @@
                     </div>
                     <div>
                         <span class="block text-[8px] font-bold text-zinc-500 uppercase">Race</span>
-                        <input type="text" id="charRace" class="w-full font-semibold bg-transparent border-b border-zinc-300 focus:outline-none" value="Elf, Wood">
+                        <input type="text" id="charRace" class="w-full font-semibold bg-transparent border-b border-zinc-300 focus:outline-none" value="">
                     </div>
                     <div>
                         <span class="block text-[8px] font-bold text-zinc-500 uppercase">Alignment</span>
-                        <input type="text" id="charAlignment" class="w-full font-semibold bg-transparent border-b border-zinc-300 focus:outline-none" value="Chaotic Good">
+                        <input type="text" id="charAlignment" class="w-full font-semibold bg-transparent border-b border-zinc-300 focus:outline-none" value="">
                     </div>
                     <div>
                         <span class="block text-[8px] font-bold text-zinc-500 uppercase">Proficiency Bonus</span>
-                        <input type="text" id="profBonus" class="w-full font-bold text-red-900 bg-transparent border-b border-zinc-300 focus:outline-none" value="+2">
+                        <input type="text" id="profBonus" class="w-full font-bold text-red-900 bg-transparent border-b border-zinc-300 focus:outline-none" value="">
                     </div>
                 </div>
             </div>
@@ -99,45 +109,45 @@
                         <!-- STR -->
                         <div class="stat-box p-1">
                             <span class="text-[9px] font-bold dnd-font text-red-900 block">STRENGTH</span>
-                            <input type="text" id="score-str" class="text-xl font-bold w-full text-center bg-transparent focus:outline-none" value="16">
-                            <div class="stat-mod" id="mod-str">+3</div>
+                            <input type="text" id="score-str" class="text-xl font-bold w-full text-center bg-transparent focus:outline-none" value="">
+                            <div class="stat-mod" id="mod-str"></div>
                         </div>
                         <!-- DEX -->
                         <div class="stat-box p-1">
                             <span class="text-[9px] font-bold dnd-font text-red-900 block">DEXTERITY</span>
-                            <input type="text" id="score-dex" class="text-xl font-bold w-full text-center bg-transparent focus:outline-none" value="17">
-                            <div class="stat-mod" id="mod-dex">+3</div>
+                            <input type="text" id="score-dex" class="text-xl font-bold w-full text-center bg-transparent focus:outline-none" value="">
+                            <div class="stat-mod" id="mod-dex"></div>
                         </div>
                         <!-- CON -->
                         <div class="stat-box p-1">
                             <span class="text-[9px] font-bold dnd-font text-red-900 block">CONSTITUTION</span>
-                            <input type="text" id="score-con" class="text-xl font-bold w-full text-center bg-transparent focus:outline-none" value="14">
-                            <div class="stat-mod" id="mod-con">+2</div>
+                            <input type="text" id="score-con" class="text-xl font-bold w-full text-center bg-transparent focus:outline-none" value="">
+                            <div class="stat-mod" id="mod-con"></div>
                         </div>
                         <!-- INT -->
                         <div class="stat-box p-1">
                             <span class="text-[9px] font-bold dnd-font text-red-900 block">INTELLIGENCE</span>
-                            <input type="text" id="score-int" class="text-xl font-bold w-full text-center bg-transparent focus:outline-none" value="13">
-                            <div class="stat-mod" id="mod-int">+1</div>
+                            <input type="text" id="score-int" class="text-xl font-bold w-full text-center bg-transparent focus:outline-none" value="">
+                            <div class="stat-mod" id="mod-int"></div>
                         </div>
                         <!-- WIS -->
                         <div class="stat-box p-1">
                             <span class="text-[9px] font-bold dnd-font text-red-900 block">WISDOM</span>
-                            <input type="text" id="score-wis" class="text-xl font-bold w-full text-center bg-transparent focus:outline-none" value="14">
-                            <div class="stat-mod" id="mod-wis">+2</div>
+                            <input type="text" id="score-wis" class="text-xl font-bold w-full text-center bg-transparent focus:outline-none" value="">
+                            <div class="stat-mod" id="mod-wis"></div>
                         </div>
                         <!-- CHA -->
                         <div class="stat-box p-1">
                             <span class="text-[9px] font-bold dnd-font text-red-900 block">CHARISMA</span>
-                            <input type="text" id="score-cha" class="text-xl font-bold w-full text-center bg-transparent focus:outline-none" value="11">
-                            <div class="stat-mod" id="mod-cha">+0</div>
+                            <input type="text" id="score-cha" class="text-xl font-bold w-full text-center bg-transparent focus:outline-none" value="">
+                            <div class="stat-mod" id="mod-cha"></div>
                         </div>
                     </div>
 
                     <!-- Passive Perception -->
                     <div class="border border-zinc-400 rounded p-1 flex items-center justify-between text-xs bg-stone-50">
                         <span class="font-bold text-[10px] uppercase">Passive Perception</span>
-                        <input type="text" id="passivePerception" class="w-8 text-center font-bold text-red-900 focus:outline-none" value="14">
+                        <input type="text" id="passivePerception" class="w-8 text-center font-bold text-red-900 focus:outline-none" value="">
                     </div>
 
                     <!-- Saving Throws -->
@@ -159,15 +169,15 @@
                     <div class="grid grid-cols-3 gap-2 text-center">
                         <div class="dnd-box p-1">
                             <span class="text-[8px] font-bold text-zinc-500 uppercase block">Armor Class</span>
-                            <input type="text" id="acVal" class="text-lg font-extrabold w-full text-center bg-transparent focus:outline-none" value="15">
+                            <input type="text" id="acVal" class="text-lg font-extrabold w-full text-center bg-transparent focus:outline-none" value="">
                         </div>
                         <div class="dnd-box p-1">
                             <span class="text-[8px] font-bold text-zinc-500 uppercase block">Initiative</span>
-                            <input type="text" id="initVal" class="text-lg font-extrabold w-full text-center bg-transparent focus:outline-none" value="+3">
+                            <input type="text" id="initVal" class="text-lg font-extrabold w-full text-center bg-transparent focus:outline-none" value="">
                         </div>
                         <div class="dnd-box p-1">
                             <span class="text-[8px] font-bold text-zinc-500 uppercase block">Speed</span>
-                            <input type="text" id="speedVal" class="text-lg font-extrabold w-full text-center bg-transparent focus:outline-none" value="35 ft">
+                            <input type="text" id="speedVal" class="text-lg font-extrabold w-full text-center bg-transparent focus:outline-none" value="">
                         </div>
                     </div>
 
@@ -175,15 +185,15 @@
                     <div class="dnd-box p-2">
                         <div class="flex justify-between items-center border-b border-zinc-200 pb-1 mb-1">
                             <span class="text-[10px] font-bold text-zinc-500">HIT POINT MAXIMUM</span>
-                            <input type="text" id="hpMax" class="w-12 text-right font-bold text-xs focus:outline-none" value="14">
+                            <input type="text" id="hpMax" class="w-12 text-right font-bold text-xs focus:outline-none" value="">
                         </div>
                         <div class="text-center py-1">
                             <span class="text-[8px] font-bold text-zinc-400 block uppercase">Current Hit Points</span>
-                            <input type="text" id="hpCurrent" class="text-2xl font-black text-red-900 w-full text-center focus:outline-none" value="14">
+                            <input type="text" id="hpCurrent" class="text-2xl font-black text-red-900 w-full text-center focus:outline-none" value="">
                         </div>
                         <div class="border-t border-zinc-200 pt-1 mt-1">
                             <span class="text-[8px] font-bold text-zinc-400 block uppercase">Temporary Hit Points</span>
-                            <input type="text" id="hpTemp" class="text-sm font-bold w-full text-center focus:outline-none" value="0">
+                            <input type="text" id="hpTemp" class="text-sm font-bold w-full text-center focus:outline-none" value="">
                         </div>
                     </div>
 
@@ -191,7 +201,7 @@
                     <div class="grid grid-cols-2 gap-2">
                         <div class="dnd-box p-2 text-center">
                             <span class="text-[8px] font-bold text-zinc-500 uppercase block">Hit Dice</span>
-                            <input type="text" id="hitDice" class="text-xs font-bold w-full text-center focus:outline-none" value="2d10">
+                            <input type="text" id="hitDice" class="text-xs font-bold w-full text-center focus:outline-none" value="">
                         </div>
                         <div class="dnd-box p-2 text-center">
                             <span class="text-[8px] font-bold text-zinc-500 uppercase block">Death Saves</span>
@@ -223,12 +233,12 @@
                 <div class="col-span-3 flex flex-col gap-2">
                     <div class="dnd-box p-2 h-1/3 flex flex-col">
                         <div class="dnd-header-box text-center mb-1">Proficiencies & Languages</div>
-                        <textarea id="profLanguages" class="w-full flex-grow text-[10px] p-1 border-none focus:outline-none resize-none bg-transparent">Armor: Light, Medium, Shields&#10;Weapons: Simple, Martial&#10;Languages: Common, Elvish</textarea>
+                        <textarea id="profLanguages" class="w-full flex-grow text-[10px] p-1 border-none focus:outline-none resize-none bg-transparent"></textarea>
                     </div>
 
                     <div class="dnd-box p-2 flex-grow flex flex-col">
                         <div class="dnd-header-box text-center mb-1">Equipment & Currency</div>
-                        <textarea id="equipmentList" class="w-full flex-grow text-[10px] p-1 border-none focus:outline-none resize-none bg-transparent">Longbow, Arrows (20), Scimitar, Leather Armor, Explorer's Pack, 15 gp</textarea>
+                        <textarea id="equipmentList" class="w-full flex-grow text-[10px] p-1 border-none focus:outline-none resize-none bg-transparent"></textarea>
                     </div>
                 </div>
 
@@ -240,7 +250,7 @@
         <!-- PAGE 2: Features, Traits & Bio -->
         <div class="sheet-page flex flex-col justify-between" id="page2">
             <div class="border-2 border-zinc-800 p-2 rounded-lg mb-3 bg-stone-50 flex justify-between items-center">
-                <span class="dnd-font font-bold text-lg text-red-900" id="p2CharName">Monty</span>
+                <span class="dnd-font font-bold text-lg text-red-900" id="p2CharName"></span>
                 <span class="text-xs font-semibold text-zinc-600">Features, Feats & Description</span>
             </div>
 
@@ -255,19 +265,19 @@
                 <div class="col-span-5 flex flex-col gap-2">
                     <div class="dnd-box p-2">
                         <div class="dnd-header-box text-center mb-1">Personality Traits</div>
-                        <textarea id="personality" class="w-full h-16 text-[10px] border-none resize-none bg-transparent focus:outline-none">Driven by the pulse of the forest and keen instincts.</textarea>
+                        <textarea id="personality" class="w-full h-16 text-[10px] border-none resize-none bg-transparent focus:outline-none"></textarea>
                     </div>
                     <div class="dnd-box p-2">
                         <div class="dnd-header-box text-center mb-1">Ideals</div>
-                        <textarea id="ideals" class="w-full h-12 text-[10px] border-none resize-none bg-transparent focus:outline-none">Nature's balance must be preserved at all costs.</textarea>
+                        <textarea id="ideals" class="w-full h-12 text-[10px] border-none resize-none bg-transparent focus:outline-none"></textarea>
                     </div>
                     <div class="dnd-box p-2">
                         <div class="dnd-header-box text-center mb-1">Bonds</div>
-                        <textarea id="bonds" class="w-full h-12 text-[10px] border-none resize-none bg-transparent focus:outline-none">I protect my comrades as I would my ancient woodland home.</textarea>
+                        <textarea id="bonds" class="w-full h-12 text-[10px] border-none resize-none bg-transparent focus:outline-none"></textarea>
                     </div>
                     <div class="dnd-box p-2 flex-grow">
                         <div class="dnd-header-box text-center mb-1">Flaws & Notes</div>
-                        <textarea id="flaws" class="w-full h-full text-[10px] border-none resize-none bg-transparent focus:outline-none">Slow to trust city dwellers and politicians.</textarea>
+                        <textarea id="flaws" class="w-full h-full text-[10px] border-none resize-none bg-transparent focus:outline-none"></textarea>
                     </div>
                 </div>
             </div>
@@ -278,22 +288,22 @@
         <!-- PAGE 3: Spellbook -->
         <div class="sheet-page flex flex-col justify-between" id="page3">
             <div class="border-2 border-zinc-800 p-2 rounded-lg mb-3 bg-stone-50 flex justify-between items-center">
-                <span class="dnd-font font-bold text-lg text-red-900" id="p3CharName">Monty</span>
+                <span class="dnd-font font-bold text-lg text-red-900" id="p3CharName"></span>
                 <span class="text-xs font-semibold text-zinc-600">Spellcasting Sheet</span>
             </div>
 
             <div class="grid grid-cols-3 gap-3 mb-3 text-center">
                 <div class="dnd-box p-2">
                     <span class="text-[8px] font-bold text-zinc-500 uppercase block">Spellcasting Ability</span>
-                    <input type="text" id="spellAbility" class="text-sm font-extrabold w-full text-center bg-transparent focus:outline-none" value="WIS">
+                    <input type="text" id="spellAbility" class="text-sm font-extrabold w-full text-center bg-transparent focus:outline-none" value="">
                 </div>
                 <div class="dnd-box p-2">
                     <span class="text-[8px] font-bold text-zinc-500 uppercase block">Spell Save DC</span>
-                    <input type="text" id="spellSaveDC" class="text-sm font-extrabold w-full text-center bg-transparent focus:outline-none" value="12">
+                    <input type="text" id="spellSaveDC" class="text-sm font-extrabold w-full text-center bg-transparent focus:outline-none" value="">
                 </div>
                 <div class="dnd-box p-2">
                     <span class="text-[8px] font-bold text-zinc-500 uppercase block">Spell Attack Bonus</span>
-                    <input type="text" id="spellAttackBonus" class="text-sm font-extrabold w-full text-center bg-transparent focus:outline-none" value="+4">
+                    <input type="text" id="spellAttackBonus" class="text-sm font-extrabold w-full text-center bg-transparent focus:outline-none" value="">
                 </div>
             </div>
 
@@ -346,7 +356,9 @@
             <div class="text-right text-[8px] text-zinc-400 mt-2">Page 3 • Spellbook</div>
         </div>
 
+        </div><!-- end sheetsWrapper -->
+
     </main>
-    <script src="script.js?v=20260821b"></script>
+    <script src="script.js?v=20260821c"></script>
 </body>
 </html>
