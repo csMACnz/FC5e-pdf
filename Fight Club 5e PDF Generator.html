@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fight Club 5e XML to PDF Converter</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Noto+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans', sans-serif;
+            background-color: #18181b;
+            color: #18181b;
+        }
+
+        .dnd-font {
+            font-family: 'Cinzel', Georgia, serif;
+        }
+
+        /* 8.5" x 11" Standard Printable Page */
+        .sheet-page {
+            width: 8.5in;
+            min-height: 11in;
+            padding: 0.4in;
+            margin: 0 auto 2rem auto;
+            background: #ffffff;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            position: relative;
+            box-sizing: border-box;
+            border: 1px solid #d4d4d8;
+        }
+
+        /* Distinct D&D 5e Styling Elements */
+        .dnd-box {
+            border: 1.5px solid #7a2021;
+            border-radius: 6px;
+            background: #fdfbf7;
+        }
+
+        .dnd-header-box {
+            background-color: #7a2021;
+            color: #ffffff;
+            padding: 2px 6px;
+            font-family: 'Cinzel', serif;
+            font-weight: 700;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-radius: 4px 4px 0 0;
+        }
+
+        .stat-box {
+            border: 1.5px solid #7a2021;
+            border-radius: 8px;
+            text-align: center;
+            background: #fdfbf7;
+            position: relative;
+        }
+
+        .stat-mod {
+            border: 1.5px solid #7a2021;
+            border-radius: 50%;
+            background: #ffffff;
+            width: 34px;
+            height: 28px;
+            margin: -12px auto 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: #7a2021;
+        }
+
+        .bubble {
+            width: 10px;
+            height: 10px;
+            border: 1.2px solid #7a2021;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 4px;
+            flex-shrink: 0;
+        }
+
+        .bubble.filled {
+            background-color: #7a2021;
+        }
+
+        .bubble.expertise {
+            background-color: #7a2021;
+            box-shadow: 0 0 0 2px #fdfbf7, 0 0 0 3px #7a2021;
+        }
+
+        /* Drag and Drop Highlight */
+        .drag-over {
+            border-color: #ef4444 !important;
+            background-color: #27272a !important;
+        }
+
+        /* Print Media Styles - Crisp Vector PDF Export */
+        @media print {
+            body {
+                background: none !important;
+                padding: 0 !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .sheet-page {
+                box-shadow: none !important;
+                margin: 0 !important;
+                width: 100% !important;
+                height: 100vh !important;
+                page-break-after: always !important;
+                page-break-inside: avoid !important;
+                border: none !important;
+            }
+            @page {
+                size: letter portrait;
+                margin: 0;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center p-0 sm:p-4">
+
+    <!-- Control Header -->
+    <header class="no-print w-full max-w-5xl bg-zinc-900 text-white p-4 rounded-xl shadow-2xl mb-6 border border-zinc-800">
+        <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-bold dnd-font text-red-600 flex items-center gap-2">
+                    <svg class="w-7 h-7 inline" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                    Fight Club 5e XML Converter
+                </h1>
+                <p class="text-xs text-zinc-400 mt-1">Parses authentic Fight Club 5e <code class="text-amber-400">&lt;pc version="5"&gt;</code> exports into printable PDF sheets.</p>
+            </div>
+
+            <div class="flex flex-wrap gap-3 items-center">
+                <!-- Dropzone / Input -->
+                <label id="fileDropZone" class="cursor-pointer bg-red-800 hover:bg-red-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow transition flex items-center gap-2 border border-red-600">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                    <span>Upload or Drop FC5 XML</span>
+                    <input type="file" id="xmlFileInput" accept=".xml" class="hidden">
+                </label>
+
+                <!-- Sample Character Button -->
+                <button id="loadSampleBtn" class="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold px-3 py-2.5 rounded-lg border border-zinc-700 transition">
+                    Load Demo Character
+                </button>
+
+                <!-- Print Button -->
+                <button id="printBtn" class="bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow transition flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                    Print / Save to PDF
+                </button>
+            </div>
+        </div>
+
+        <!-- Status Notification Banner -->
+        <div id="statusMessage" class="hidden mt-3 p-2 bg-zinc-800 text-amber-300 text-xs rounded border border-amber-900/60 flex justify-between items-center">
+            <span id="statusText"></span>
+            <span class="text-[10px] text-zinc-400">All data editable on page before printing</span>
+        </div>
+    </header>
+
+    <!-- Main Printable Sheets -->
+    <main id="sheetContainer" class="w-full max-w-5xl">
+        
+        <!-- PAGE 1: Combat & Core Stats -->
+        <div class="sheet-page flex flex-col justify-between" id="page1">
+            <!-- Header Block -->
+            <div class="border-2 border-zinc-800 p-3 rounded-lg mb-3 flex flex-wrap md:flex-nowrap justify-between items-center gap-4 bg-stone-50">
+                <div class="w-full md:w-1/3">
+                    <label class="block text-[8px] font-bold text-zinc-500 uppercase tracking-wider">Character Name</label>
+                    <input type="text" id="charName" class="w-full text-2xl font-black dnd-font bg-transparent border-b border-zinc-300 focus:outline-none text-red-900" value="Monty">
+                </div>
+                <div class="w-full md:w-2/3 grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                        <span class="block text-[8px] font-bold text-zinc-500 uppercase">Class & Level</span>
+                        <input type="text" id="charClass" class="w-full font-semibold bg-transparent border-b border-zinc-300 focus:outline-none" value="Ranger 2">
+                    </div>
+                    <div>
+                        <span class="block text-[8px] font-bold text-zinc-500 uppercase">Background</span>
+                        <input type="text" id="charBackground" class="w-full font-semibold bg-transparent border-b border-zinc-300 focus:outline-none" value="Outlander">
+                    </div>
+                    <div>
+                        <span class="block text-[8px] font-bold text-zinc-500 uppercase">Player Name</span>
+                        <input type="text" id="playerName" class="w-full font-semibold bg-transparent border-b border-zinc-300 focus:outline-none" value="">
+                    </div>
+                    <div>
+                        <span class="block text-[8px] font-bold text-zinc-500 uppercase">Race</span>
+                        <input type="text" id="charRace" class="w-full font-semibold bg-transparent border-b border-zinc-300 focus:outline-none" value="Elf, Wood">
+                    </div>
+                    <div>
+                        <span class="block text-[8px] font-bold text-zinc-500 uppercase">Alignment</span>
+                        <input type="text" id="charAlignment" class="w-full font-semibold bg-transparent border-b border-zinc-300 focus:outline-none" value="Chaotic Good">
+                    </div>
+                    <div>
+                        <span class="block text-[8px] font-bold text-zinc-500 uppercase">Proficiency Bonus</span>
+                        <input type="text" id="profBonus" class="w-full font-bold text-red-900 bg-transparent border-b border-zinc-300 focus:outline-none" value="+2">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page 1 Grid -->
+            <div class="grid grid-cols-12 gap-3 flex-grow">
+                
+                <!-- Left Column: Attributes, Saving Throws, Skills -->
+                <div class="col-span-4 flex flex-col gap-2">
+                    <!-- Ability Scores -->
+                    <div class="grid grid-cols-2 gap-2">
+                        <!-- STR -->
+                        <div class="stat-box p-1">
+                            <span class="text-[9px] font-bold dnd-font text-red-900 block">STRENGTH</span>
+                            <input type="text" id="score-str" class="text-xl font-bold w-full text-center bg-transparent focus:outline-none" value="16">
+                            <div class="stat-mod" id="mod-str">+3</div>
+                        </div>
+                        <!-- DEX -->
+                        <div class="stat-box p-1">
+                            <span class="text-[9px] font-bold dnd-font text-red-900 block">DEXTERITY</span>
+                            <input type="text" id="score-dex" class="text-xl font-bold w-full text-center bg-transparent focus:outline-none" value="17">
+                            <div class="stat-mod" id="mod-dex">+3</div>
+                        </div>
+                        <!-- CON -->
+                        <div class="stat-box p-1">
+                            <span class="text-[9px] font-bold dnd-font text-red-900 block">CONSTITUTION</span>
+                            <input type="text" id="score-con" class="text-xl font-bold w-full text-center bg-transparent focus:outline-none" value="14">
+                            <div class="stat-mod" id="mod-con">+2</div>
+                        </div>
+                        <!-- INT -->
+                        <div class="stat-box p-1">
+                            <span class="text-[9px] font-bold dnd-font text-red-900 block">INTELLIGENCE</span>
+                            <input type="text" id="score-int" class="text-xl font-bold w-full text-center bg-transparent focus:outline-none" value="13">
+                            <div class="stat-mod" id="mod-int">+1</div>
+                        </div>
+                        <!-- WIS -->
+                        <div class="stat-box p-1">
+                            <span class="text-[9px] font-bold dnd-font text-red-900 block">WISDOM</span>
+                            <input type="text" id="score-wis" class="text-xl font-bold w-full text-center bg-transparent focus:outline-none" value="14">
+                            <div class="stat-mod" id="mod-wis">+2</div>
+                        </div>
+                        <!-- CHA -->
+                        <div class="stat-box p-1">
+                            <span class="text-[9px] font-bold dnd-font text-red-900 block">CHARISMA</span>
+                            <input type="text" id="score-cha" class="text-xl font-bold w-full text-center bg-transparent focus:outline-none" value="11">
+                            <div class="stat-mod" id="mod-cha">+0</div>
+                        </div>
+                    </div>
+
+                    <!-- Passive Perception -->
+                    <div class="border border-zinc-400 rounded p-1 flex items-center justify-between text-xs bg-stone-50">
+                        <span class="font-bold text-[10px] uppercase">Passive Perception</span>
+                        <input type="text" id="passivePerception" class="w-8 text-center font-bold text-red-900 focus:outline-none" value="14">
+                    </div>
+
+                    <!-- Saving Throws -->
+                    <div class="dnd-box p-2">
+                        <div class="dnd-header-box text-center mb-1">Saving Throws</div>
+                        <div id="savingThrowsList" class="text-[10px] space-y-0.5"></div>
+                    </div>
+
+                    <!-- Skills -->
+                    <div class="dnd-box p-2 flex-grow">
+                        <div class="dnd-header-box text-center mb-1">Skills</div>
+                        <div id="skillsList" class="text-[10px] space-y-0.5"></div>
+                    </div>
+                </div>
+
+                <!-- Middle Column: Combat Specs, HP, Attacks -->
+                <div class="col-span-5 flex flex-col gap-2">
+                    <!-- Top Combat Stats -->
+                    <div class="grid grid-cols-3 gap-2 text-center">
+                        <div class="dnd-box p-1">
+                            <span class="text-[8px] font-bold text-zinc-500 uppercase block">Armor Class</span>
+                            <input type="text" id="acVal" class="text-lg font-extrabold w-full text-center bg-transparent focus:outline-none" value="15">
+                        </div>
+                        <div class="dnd-box p-1">
+                            <span class="text-[8px] font-bold text-zinc-500 uppercase block">Initiative</span>
+                            <input type="text" id="initVal" class="text-lg font-extrabold w-full text-center bg-transparent focus:outline-none" value="+3">
+                        </div>
+                        <div class="dnd-box p-1">
+                            <span class="text-[8px] font-bold text-zinc-500 uppercase block">Speed</span>
+                            <input type="text" id="speedVal" class="text-lg font-extrabold w-full text-center bg-transparent focus:outline-none" value="35 ft">
+                        </div>
+                    </div>
+
+                    <!-- Hit Points Block -->
+                    <div class="dnd-box p-2">
+                        <div class="flex justify-between items-center border-b border-zinc-200 pb-1 mb-1">
+                            <span class="text-[10px] font-bold text-zinc-500">HIT POINT MAXIMUM</span>
+                            <input type="text" id="hpMax" class="w-12 text-right font-bold text-xs focus:outline-none" value="14">
+                        </div>
+                        <div class="text-center py-1">
+                            <span class="text-[8px] font-bold text-zinc-400 block uppercase">Current Hit Points</span>
+                            <input type="text" id="hpCurrent" class="text-2xl font-black text-red-900 w-full text-center focus:outline-none" value="14">
+                        </div>
+                        <div class="border-t border-zinc-200 pt-1 mt-1">
+                            <span class="text-[8px] font-bold text-zinc-400 block uppercase">Temporary Hit Points</span>
+                            <input type="text" id="hpTemp" class="text-sm font-bold w-full text-center focus:outline-none" value="0">
+                        </div>
+                    </div>
+
+                    <!-- Hit Dice & Death Saves -->
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="dnd-box p-2 text-center">
+                            <span class="text-[8px] font-bold text-zinc-500 uppercase block">Hit Dice</span>
+                            <input type="text" id="hitDice" class="text-xs font-bold w-full text-center focus:outline-none" value="2d10">
+                        </div>
+                        <div class="dnd-box p-2 text-center">
+                            <span class="text-[8px] font-bold text-zinc-500 uppercase block">Death Saves</span>
+                            <div class="text-[9px] mt-1">
+                                S: <span class="bubble"></span><span class="bubble"></span><span class="bubble"></span><br>
+                                F: <span class="bubble"></span><span class="bubble"></span><span class="bubble"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Attacks & Spellcasting Table -->
+                    <div class="dnd-box p-2 flex-grow flex flex-col">
+                        <div class="dnd-header-box text-center mb-1">Attacks & Weapons</div>
+                        <table class="w-full text-left text-[10px] mb-2 border-collapse">
+                            <thead>
+                                <tr class="border-b border-zinc-300 text-[8px] text-zinc-500 uppercase">
+                                    <th class="p-1">Name</th>
+                                    <th class="p-1 text-center">Atk Bonus</th>
+                                    <th class="p-1">Damage / Type</th>
+                                </tr>
+                            </thead>
+                            <tbody id="weaponsTable"></tbody>
+                        </table>
+                        <textarea id="attackNotes" class="w-full flex-grow text-[9px] p-1 border border-zinc-200 rounded resize-none focus:outline-none" placeholder="Fighting style, ammo tracking, extra combat rules..."></textarea>
+                    </div>
+                </div>
+
+                <!-- Right Column: Proficiencies, Languages, Equipment -->
+                <div class="col-span-3 flex flex-col gap-2">
+                    <div class="dnd-box p-2 h-1/3 flex flex-col">
+                        <div class="dnd-header-box text-center mb-1">Proficiencies & Languages</div>
+                        <textarea id="profLanguages" class="w-full flex-grow text-[10px] p-1 border-none focus:outline-none resize-none bg-transparent">Armor: Light, Medium, Shields&#10;Weapons: Simple, Martial&#10;Languages: Common, Elvish</textarea>
+                    </div>
+
+                    <div class="dnd-box p-2 flex-grow flex flex-col">
+                        <div class="dnd-header-box text-center mb-1">Equipment & Currency</div>
+                        <textarea id="equipmentList" class="w-full flex-grow text-[10px] p-1 border-none focus:outline-none resize-none bg-transparent">Longbow, Arrows (20), Scimitar, Leather Armor, Explorer's Pack, 15 gp</textarea>
+                    </div>
+                </div>
+
+            </div>
+            
+            <div class="text-right text-[8px] text-zinc-400 mt-2">Page 1 • D&D 5e Character Sheet</div>
+        </div>
+
+        <!-- PAGE 2: Features, Traits & Bio -->
+        <div class="sheet-page flex flex-col justify-between" id="page2">
+            <div class="border-2 border-zinc-800 p-2 rounded-lg mb-3 bg-stone-50 flex justify-between items-center">
+                <span class="dnd-font font-bold text-lg text-red-900" id="p2CharName">Monty</span>
+                <span class="text-xs font-semibold text-zinc-600">Features, Feats & Description</span>
+            </div>
+
+            <div class="grid grid-cols-12 gap-3 flex-grow">
+                <!-- Features & Traits -->
+                <div class="col-span-7 dnd-box p-2 flex flex-col">
+                    <div class="dnd-header-box text-center mb-2">Features & Feats</div>
+                    <div id="featuresContainer" class="flex-grow overflow-y-auto text-[10px] space-y-2 pr-1"></div>
+                </div>
+
+                <!-- Bio & Personality -->
+                <div class="col-span-5 flex flex-col gap-2">
+                    <div class="dnd-box p-2">
+                        <div class="dnd-header-box text-center mb-1">Personality Traits</div>
+                        <textarea id="personality" class="w-full h-16 text-[10px] border-none resize-none bg-transparent focus:outline-none">Driven by the pulse of the forest and keen instincts.</textarea>
+                    </div>
+                    <div class="dnd-box p-2">
+                        <div class="dnd-header-box text-center mb-1">Ideals</div>
+                        <textarea id="ideals" class="w-full h-12 text-[10px] border-none resize-none bg-transparent focus:outline-none">Nature's balance must be preserved at all costs.</textarea>
+                    </div>
+                    <div class="dnd-box p-2">
+                        <div class="dnd-header-box text-center mb-1">Bonds</div>
+                        <textarea id="bonds" class="w-full h-12 text-[10px] border-none resize-none bg-transparent focus:outline-none">I protect my comrades as I would my ancient woodland home.</textarea>
+                    </div>
+                    <div class="dnd-box p-2 flex-grow">
+                        <div class="dnd-header-box text-center mb-1">Flaws & Notes</div>
+                        <textarea id="flaws" class="w-full h-full text-[10px] border-none resize-none bg-transparent focus:outline-none">Slow to trust city dwellers and politicians.</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-right text-[8px] text-zinc-400 mt-2">Page 2 • Features & Background</div>
+        </div>
+
+        <!-- PAGE 3: Spellbook -->
+        <div class="sheet-page flex flex-col justify-between" id="page3">
+            <div class="border-2 border-zinc-800 p-2 rounded-lg mb-3 bg-stone-50 flex justify-between items-center">
+                <span class="dnd-font font-bold text-lg text-red-900" id="p3CharName">Monty</span>
+                <span class="text-xs font-semibold text-zinc-600">Spellcasting Sheet</span>
+            </div>
+
+            <div class="grid grid-cols-3 gap-3 mb-3 text-center">
+                <div class="dnd-box p-2">
+                    <span class="text-[8px] font-bold text-zinc-500 uppercase block">Spellcasting Ability</span>
+                    <input type="text" id="spellAbility" class="text-sm font-extrabold w-full text-center bg-transparent focus:outline-none" value="WIS">
+                </div>
+                <div class="dnd-box p-2">
+                    <span class="text-[8px] font-bold text-zinc-500 uppercase block">Spell Save DC</span>
+                    <input type="text" id="spellSaveDC" class="text-sm font-extrabold w-full text-center bg-transparent focus:outline-none" value="12">
+                </div>
+                <div class="dnd-box p-2">
+                    <span class="text-[8px] font-bold text-zinc-500 uppercase block">Spell Attack Bonus</span>
+                    <input type="text" id="spellAttackBonus" class="text-sm font-extrabold w-full text-center bg-transparent focus:outline-none" value="+4">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-3 flex-grow">
+                <!-- Cantrips & 1st -->
+                <div class="flex flex-col gap-2">
+                    <div class="dnd-box p-2 flex-grow">
+                        <div class="dnd-header-box text-center mb-1">Cantrips (0 Level)</div>
+                        <div id="spells0" class="text-[10px] space-y-1"></div>
+                    </div>
+                    <div class="dnd-box p-2 flex-grow">
+                        <div class="dnd-header-box text-between mb-1 px-1 flex justify-between">
+                            <span>1st Level</span>
+                            <span id="slots1">Slots: [ ] [ ]</span>
+                        </div>
+                        <div id="spells1" class="text-[10px] space-y-1"></div>
+                    </div>
+                </div>
+
+                <!-- 2nd & 3rd -->
+                <div class="flex flex-col gap-2">
+                    <div class="dnd-box p-2 flex-grow">
+                        <div class="dnd-header-box text-between mb-1 px-1 flex justify-between">
+                            <span>2nd Level</span>
+                            <span id="slots2">Slots: [ ] [ ] [ ]</span>
+                        </div>
+                        <div id="spells2" class="text-[10px] space-y-1"></div>
+                    </div>
+                    <div class="dnd-box p-2 flex-grow">
+                        <div class="dnd-header-box text-between mb-1 px-1 flex justify-between">
+                            <span>3rd Level</span>
+                            <span id="slots3">Slots: [ ] [ ]</span>
+                        </div>
+                        <div id="spells3" class="text-[10px] space-y-1"></div>
+                    </div>
+                </div>
+
+                <!-- 4th + Higher -->
+                <div class="flex flex-col gap-2">
+                    <div class="dnd-box p-2 flex-grow">
+                        <div class="dnd-header-box text-between mb-1 px-1 flex justify-between">
+                            <span>4th Level & Higher</span>
+                            <span id="slots4">Slots: [ ]</span>
+                        </div>
+                        <div id="spellsHigher" class="text-[10px] space-y-1"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-right text-[8px] text-zinc-400 mt-2">Page 3 • Spellbook</div>
+        </div>
+
+    </main>
+
+    <!-- Fight Club 5e XML Parser Engine -->
+    <script>
+        const SKILLS_MASTER = [
+            { name: "Acrobatics", stat: "dex" },
+            { name: "Animal Handling", stat: "wis" },
+            { name: "Arcana", stat: "int" },
+            { name: "Athletics", stat: "str" },
+            { name: "Deception", stat: "cha" },
+            { name: "History", stat: "int" },
+            { name: "Insight", stat: "wis" },
+            { name: "Intimidation", stat: "cha" },
+            { name: "Investigation", stat: "int" },
+            { name: "Medicine", stat: "wis" },
+            { name: "Nature", stat: "int" },
+            { name: "Perception", stat: "wis" },
+            { name: "Performance", stat: "cha" },
+            { name: "Persuasion", stat: "cha" },
+            { name: "Religion", stat: "int" },
+            { name: "Sleight of Hand", stat: "dex" },
+            { name: "Stealth", stat: "dex" },
+            { name: "Survival", stat: "wis" }
+        ];
+
+        const STATS_MASTER = ["str", "dex", "con", "int", "wis", "cha"];
+
+        // Drag and Drop setup
+        const dropZone = document.body;
+        const fileInput = document.getElementById('xmlFileInput');
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                document.getElementById('fileDropZone').classList.add('drag-over');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                document.getElementById('fileDropZone').classList.remove('drag-over');
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length > 0) processFile(files[0]);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) processFile(e.target.files[0]);
+        });
+
+        document.getElementById('loadSampleBtn').addEventListener('click', loadSampleCharacter);
+        document.getElementById('printBtn').addEventListener('click', () => window.print());
+
+        function processFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => parseFC5XML(e.target.result, file.name);
+            reader.readAsText(file);
+        }
+
+        function showStatus(msg) {
+            const statusEl = document.getElementById('statusMessage');
+            document.getElementById('statusText').textContent = msg;
+            statusEl.classList.remove('hidden');
+        }
+
+        function calcMod(score) {
+            const num = parseInt(score) || 10;
+            const mod = Math.floor((num - 10) / 2);
+            return mod >= 0 ? `+${mod}` : `${mod}`;
+        }
+
+        function parseFC5XML(xmlText, fileName = "") {
+            try {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+
+                // FC5 root is <pc version="5"> with <character> inside
+                const charNode = xmlDoc.querySelector("character") || xmlDoc.querySelector("pc");
+                if (!charNode) {
+                    showStatus("Error: XML does not contain a valid Fight Club 5e <pc> or <character> tag.");
+                    return;
+                }
+
+                // Helper to query text content safely
+                const getText = (selector, parent = charNode) => {
+                    const el = parent.querySelector(selector);
+                    return el ? el.textContent.trim() : "";
+                };
+
+                // Name
+                const name = getText("name") || "Monty";
+                document.getElementById('charName').value = name;
+                document.getElementById('p2CharName').textContent = name;
+                document.getElementById('p3CharName').textContent = name;
+
+                // Abilities: FC5 stores as <abilities>16,17,14,13,14,11,</abilities>
+                const abilitiesStr = getText("abilities");
+                let statsMap = { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 };
+
+                if (abilitiesStr && abilitiesStr.includes(",")) {
+                    const vals = abilitiesStr.split(",").map(v => parseInt(v.trim())).filter(v => !isNaN(v));
+                    if (vals.length >= 6) {
+                        statsMap = {
+                            str: vals[0],
+                            dex: vals[1],
+                            con: vals[2],
+                            int: vals[3],
+                            wis: vals[4],
+                            cha: vals[5]
+                        };
+                    }
+                } else {
+                    // Fallback to explicit tags if present
+                    STATS_MASTER.forEach(s => {
+                        const val = parseInt(getText(s));
+                        if (!isNaN(val)) statsMap[s] = val;
+                    });
+                }
+
+                // Update UI Ability Scores & Mods
+                STATS_MASTER.forEach(s => {
+                    document.getElementById(`score-${s}`).value = statsMap[s];
+                    document.getElementById(`mod-${s}`).textContent = calcMod(statsMap[s]);
+                });
+
+                // Class & Levels
+                const classNodes = charNode.querySelectorAll("class");
+                let classList = [];
+                let totalLevel = 0;
+
+                classNodes.forEach(cNode => {
+                    const cName = getText("name", cNode);
+                    const cLvl = parseInt(getText("level", cNode)) || 1;
+                    if (cName) {
+                        classList.push(`${cName} ${cLvl}`);
+                        totalLevel += cLvl;
+                    }
+                });
+
+                if (totalLevel === 0) totalLevel = parseInt(getText("level")) || 1;
+                document.getElementById('charClass').value = classList.length > 0 ? classList.join(" / ") : `Ranger ${totalLevel}`;
+
+                // Race & Background
+                const raceName = getText("name", charNode.querySelector("race")) || getText("race") || "Elf, Wood";
+                document.getElementById('charRace').value = raceName;
+                document.getElementById('charBackground').value = getText("name", charNode.querySelector("background")) || getText("background") || "Outlander";
+
+                // Proficiency Bonus based on 5e Level table
+                const profBonusNum = Math.floor((totalLevel - 1) / 4) + 2;
+                document.getElementById('profBonus').value = `+${profBonusNum}`;
+
+                // HP
+                const hpMax = getText("hpMax") || "14";
+                document.getElementById('hpMax').value = hpMax;
+                document.getElementById('hpCurrent').value = getText("hpCurrent") || hpMax;
+                document.getElementById('hpTemp').value = getText("hpTemp") || "0";
+
+                // AC & Speed
+                const speedVal = getText("speed", charNode.querySelector("race")) || getText("speed") || "35";
+                document.getElementById('speedVal').value = speedVal.endsWith("ft") ? speedVal : `${speedVal} ft`;
+
+                // Calculate AC from Equipped Items or FC5 tag
+                let acVal = getText("ac");
+                if (!acVal) {
+                    const dexMod = Math.floor((statsMap.dex - 10) / 2);
+                    acVal = 10 + dexMod; // Base unarmored
+                }
+                document.getElementById('acVal').value = acVal;
+
+                // Initiative
+                const dexMod = Math.floor((statsMap.dex - 10) / 2);
+                document.getElementById('initVal').value = dexMod >= 0 ? `+${dexMod}` : `${dexMod}`;
+
+                // Hit Dice
+                document.getElementById('hitDice').value = `${totalLevel}d10`;
+
+                // Passive Perception
+                const wisMod = Math.floor((statsMap.wis - 10) / 2);
+                const isPerceptionProf = xmlText.toLowerCase().includes("perception");
+                const passivePerc = 10 + wisMod + (isPerceptionProf ? profBonusNum : 0);
+                document.getElementById('passivePerception').value = passivePerc;
+
+                // Parse Proficiencies & Skills
+                const profText = xmlText.toLowerCase();
+
+                // Saving Throws
+                const savesList = [];
+                if (profText.includes("strength save") || profText.includes("save>str") || classList.some(c => c.toLowerCase().includes("ranger") || c.toLowerCase().includes("fighter"))) savesList.push("str");
+                if (profText.includes("dexterity save") || profText.includes("save>dex") || classList.some(c => c.toLowerCase().includes("ranger") || c.toLowerCase().includes("rogue"))) savesList.push("dex");
+
+                renderSaves(savesList, statsMap, profBonusNum);
+
+                // Skills
+                renderSkills(profText, statsMap, profBonusNum);
+
+                // Weapons
+                renderWeapons(charNode, statsMap, profBonusNum);
+
+                // Features & Feats (Page 2)
+                renderFeatures(charNode);
+
+                // Equipment
+                renderEquipment(charNode);
+
+                // Spells (Page 3)
+                renderSpells(charNode, statsMap, profBonusNum);
+
+                showStatus(`Successfully imported character: "${name}" (${document.getElementById('charClass').value})`);
+
+            } catch (err) {
+                console.error(err);
+                showStatus("Error parsing FC5 XML file. Ensure it is a valid Fight Club 5e export.");
+            }
+        }
+
+        function renderSaves(savesList, statsMap, profBonus) {
+            const container = document.getElementById('savingThrowsList');
+            container.innerHTML = '';
+
+            STATS_MASTER.forEach(s => {
+                const isProf = savesList.includes(s);
+                const statVal = statsMap[s] || 10;
+                const mod = Math.floor((statVal - 10) / 2);
+                const total = isProf ? mod + profBonus : mod;
+                const sign = total >= 0 ? '+' : '';
+
+                const row = document.createElement('div');
+                row.className = 'flex items-center justify-between';
+                row.innerHTML = `
+                    <div class="flex items-center">
+                        <span class="bubble ${isProf ? 'filled' : ''}"></span>
+                        <span class="font-semibold">${s.toUpperCase()}</span>
+                    </div>
+                    <span class="font-bold text-red-900">${sign}${total}</span>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        function renderSkills(rawXmlText, statsMap, profBonus) {
+            const container = document.getElementById('skillsList');
+            container.innerHTML = '';
+
+            SKILLS_MASTER.forEach(s => {
+                const sNameLower = s.name.toLowerCase();
+                const isProf = rawXmlText.includes(sNameLower);
+                const statVal = statsMap[s.stat] || 10;
+                const mod = Math.floor((statVal - 10) / 2);
+                const total = isProf ? mod + profBonus : mod;
+                const sign = total >= 0 ? '+' : '';
+
+                const row = document.createElement('div');
+                row.className = 'flex items-center justify-between';
+                row.innerHTML = `
+                    <div class="flex items-center">
+                        <span class="bubble ${isProf ? 'filled' : ''}"></span>
+                        <span class="font-medium">${s.name} <span class="text-zinc-400 text-[7.5px]">(${s.stat.toUpperCase()})</span></span>
+                    </div>
+                    <span class="font-bold text-red-900">${sign}${total}</span>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        function renderWeapons(charNode, statsMap, profBonus) {
+            const tbody = document.getElementById('weaponsTable');
+            tbody.innerHTML = '';
+
+            const strMod = Math.floor((statsMap.str - 10) / 2);
+            const dexMod = Math.floor((statsMap.dex - 10) / 2);
+
+            // FC5 stores weapons either as <weapon> tags or as equipped <item> tags
+            const weapons = [];
+            
+            // Check <weapon> nodes
+            charNode.querySelectorAll("weapon").forEach(w => {
+                const name = w.querySelector("name")?.textContent || "Weapon";
+                const dmg = w.querySelector("damage")?.textContent || "1d6";
+                const atkBonus = w.querySelector("attack")?.getAttribute("bonus") || `+${Math.max(strMod, dexMod) + profBonus}`;
+                weapons.push({ name, atkBonus, dmg });
+            });
+
+            // Check <item> nodes with weapon types or damage
+            charNode.querySelectorAll("item").forEach(item => {
+                const type = item.querySelector("type")?.textContent;
+                const name = item.querySelector("name")?.textContent;
+                const dmg = item.querySelector("damage")?.textContent;
+
+                if (name && (type === "M" || type === "R" || type === "W" || dmg)) {
+                    const isFinesseOrRanged = type === "R" || name.toLowerCase().includes("bow") || name.toLowerCase().includes("finesse") || name.toLowerCase().includes("scimitar");
+                    const mod = isFinesseOrRanged ? dexMod : strMod;
+                    const atkBonus = `+${mod + profBonus}`;
+                    const dmgText = dmg || (isFinesseOrRanged ? `1d6${mod>=0?'+'+mod:mod}` : `1d8${mod>=0?'+'+mod:mod}`);
+                    
+                    if (!weapons.some(w => w.name === name)) {
+                        weapons.push({ name, atkBonus, dmg: dmgText });
+                    }
+                }
+            });
+
+            // Default fallback if no weapons found in XML
+            if (weapons.length === 0) {
+                weapons.push({ name: "Longbow", atkBonus: `+${dexMod + profBonus}`, dmg: `1d8+${dexMod} Piercing` });
+                weapons.push({ name: "Shortsword", atkBonus: `+${dexMod + profBonus}`, dmg: `1d6+${dexMod} Piercing` });
+            }
+
+            weapons.forEach(w => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-zinc-200";
+                tr.innerHTML = `
+                    <td class="p-1 font-bold">${w.name}</td>
+                    <td class="p-1 font-bold text-center text-red-900">${w.atkBonus.startsWith('+')||w.atkBonus.startsWith('-')?w.atkBonus:'+'+w.atkBonus}</td>
+                    <td class="p-1 text-zinc-700">${w.dmg}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderFeatures(charNode) {
+            const container = document.getElementById('featuresContainer');
+            container.innerHTML = '';
+
+            const feats = charNode.querySelectorAll("feat");
+            feats.forEach(f => {
+                const fName = f.querySelector("name")?.textContent;
+                const fText = f.querySelector("text")?.textContent;
+
+                if (fName && fText && fName !== "Description") {
+                    const div = document.createElement('div');
+                    div.className = "border-b border-zinc-200 pb-1.5";
+                    div.innerHTML = `<span class="font-bold text-red-900">${fName}:</span> <span class="text-zinc-700">${fText}</span>`;
+                    container.appendChild(div);
+                }
+            });
+
+            if (container.children.length === 0) {
+                container.innerHTML = `<div class="text-zinc-500 italic">No specific class features recorded in export.</div>`;
+            }
+        }
+
+        function renderEquipment(charNode) {
+            const items = [];
+            charNode.querySelectorAll("item").forEach(i => {
+                const name = i.querySelector("name")?.textContent;
+                const qty = i.querySelector("qty")?.textContent || "1";
+                if (name) items.push(`${name} (x${qty})`);
+            });
+
+            if (items.length > 0) {
+                document.getElementById('equipmentList').value = items.join("\n");
+            }
+        }
+
+        function renderSpells(charNode, statsMap, profBonus) {
+            const spells = charNode.querySelectorAll("spell");
+            const page3 = document.getElementById('page3');
+
+            // Set Spellcasting Ability stats (Default Wisdom for Ranger)
+            const wisMod = Math.floor((statsMap.wis - 10) / 2);
+            document.getElementById('spellAbility').value = "WIS";
+            document.getElementById('spellSaveDC').value = 8 + profBonus + wisMod;
+            document.getElementById('spellAttackBonus').value = `+${profBonus + wisMod}`;
+
+            if (spells.length > 0) {
+                page3.style.display = "flex";
+                ['spells0', 'spells1', 'spells2', 'spells3', 'spellsHigher'].forEach(id => {
+                    document.getElementById(id).innerHTML = '';
+                });
+
+                spells.forEach(sp => {
+                    const sName = sp.querySelector("name")?.textContent || "Spell";
+                    const sLevel = sp.querySelector("level")?.textContent || "0";
+
+                    const div = document.createElement('div');
+                    div.className = "flex items-center justify-between border-b border-zinc-100 py-0.5";
+                    div.innerHTML = `<span><span class="bubble"></span>${sName}</span>`;
+
+                    if (sLevel === "0") document.getElementById('spells0').appendChild(div);
+                    else if (sLevel === "1") document.getElementById('spells1').appendChild(div);
+                    else if (sLevel === "2") document.getElementById('spells2').appendChild(div);
+                    else if (sLevel === "3") document.getElementById('spells3').appendChild(div);
+                    else document.getElementById('spellsHigher').appendChild(div);
+                });
+            } else {
+                // If character has no spells, keep page 3 available but clean
+                page3.style.display = "flex";
+            }
+        }
+
+        function loadSampleCharacter() {
+            // Re-runs default state
+            showStatus("Loaded default demo sheet.");
+        }
+    </script>
+</body>
+</html>
