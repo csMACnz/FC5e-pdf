@@ -127,22 +127,23 @@ const SKILLS_MASTER = [
 
                 // Class & Levels
                 const classNodes = charNode.querySelectorAll("class");
-                let classList = [];
                 let totalLevel = 0;
                 let hitDiceStr = "";
 
+                const classInfos = [];
                 classNodes.forEach(cNode => {
-                    const cName = cNode.querySelector("name")?.textContent.trim() || "";
-                    const cLvl = parseInt(cNode.querySelector("level")?.textContent.trim()) || 1;
-                    const cHd = cNode.querySelector("hd")?.textContent.trim() || "8";
+                    const cName = cNode.querySelector(":scope > name")?.textContent.trim() || "";
+                    const cLvl = parseInt(cNode.querySelector(":scope > level")?.textContent.trim()) || 0;
+                    const cHd = cNode.querySelector(":scope > hd")?.textContent.trim() || "8";
                     if (cName) {
-                        classList.push(`${cName} ${cLvl}`);
+                        classInfos.push({ name: cName, level: cLvl, hd: cHd });
                         totalLevel += cLvl;
-                        hitDiceStr += (hitDiceStr ? " + " : "") + `${cLvl}d${cHd}`;
+                        hitDiceStr += (hitDiceStr ? " + " : "") + `${cLvl || 1}d${cHd}`;
                     }
                 });
 
                 if (totalLevel === 0) totalLevel = parseInt(getText("level")) || 1;
+                const classList = classInfos.map(c => `${c.name} ${c.level || (classInfos.length === 1 ? totalLevel : 1)}`);
                 document.getElementById('charClass').value = classList.length > 0 ? classList.join(" / ") : "";
 
                 // Race & Background - use direct child selectors to avoid grabbing character <name>
