@@ -94,6 +94,10 @@ body {
                 background: none !important;
                 padding: 0 !important;
             }
+            .bubble {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
             textarea::placeholder {
                 color: transparent !important;
             }
