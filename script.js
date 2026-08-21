@@ -86,6 +86,12 @@ const SKILLS_MASTER = [
             return parent?.querySelector(`:scope > ${tagName}`)?.textContent.trim() || "";
         }
 
+        function getDirectChildrenByTag(parent, tagName) {
+            if (!parent) return [];
+            const target = tagName.toLowerCase();
+            return Array.from(parent.children || []).filter(child => (child.tagName || "").toLowerCase() === target);
+        }
+
         function cleanFeatureText(text) {
             return (text || "")
                 .replace(/\s*Source:[\s\S]*$/i, "")
@@ -398,7 +404,11 @@ const SKILLS_MASTER = [
                 const profSkillSet = new Set();
                 const profSaveSet = new Set();
 
-                charNode.querySelectorAll(":scope > proficiency").forEach(p => {
+                const skillProfNodes = [
+                    ...getDirectChildrenByTag(charNode, "proficiency"),
+                    ...getDirectChildrenByTag(charNode, "proficiencies").flatMap(node => getDirectChildrenByTag(node, "proficiency"))
+                ];
+                skillProfNodes.forEach(p => {
                     const val = p.textContent.trim();
                     const num = parseInt(val);
                     if (!isNaN(num) && String(num) === val) {
@@ -417,7 +427,12 @@ const SKILLS_MASTER = [
                     }
                 });
 
-                charNode.querySelectorAll(":scope > saving-throw").forEach(p => {
+                const savingThrowNodes = [
+                    ...getDirectChildrenByTag(charNode, "saving-throw"),
+                    ...getDirectChildrenByTag(charNode, "saving-throws").flatMap(node => getDirectChildrenByTag(node, "saving-throw")),
+                    ...getDirectChildrenByTag(charNode, "savingthrows").flatMap(node => getDirectChildrenByTag(node, "saving-throw"))
+                ];
+                savingThrowNodes.forEach(p => {
                     profSaveSet.add(p.textContent.trim().toLowerCase());
                 });
 
