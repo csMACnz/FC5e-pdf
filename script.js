@@ -412,11 +412,11 @@ const SKILLS_MASTER = [
                     const val = p.textContent.trim();
                     const num = parseInt(val);
                     if (!isNaN(num) && String(num) === val) {
-                        // Direct skill index (0–17)
-                        if (num >= 0 && num < SKILLS_MASTER.length) {
-                            profSkillSet.add(SKILLS_MASTER[num].name.toLowerCase());
+                        // Numbers 0–5 are saving throw indices (STR=0, DEX=1, CON=2, INT=3, WIS=4, CHA=5)
+                        if (num >= 0 && num < STATS_MASTER.length) {
+                            profSaveSet.add(STATS_MASTER[num]);
                         } else {
-                            // Legacy fallback: some exports used a 100-based offset
+                            // Numbers 100+ encode skill proficiency as (100 + skill index)
                             const skillIdx = num - 100;
                             if (skillIdx >= 0 && skillIdx < SKILLS_MASTER.length) {
                                 profSkillSet.add(SKILLS_MASTER[skillIdx].name.toLowerCase());
