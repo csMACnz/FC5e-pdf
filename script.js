@@ -175,6 +175,99 @@ const SKILLS_MASTER = [
             return abilityMods;
         }
 
+        function collectTrackers(charNode, classInfos) {
+            const trackers = [];
+            const seen = new Set();
+            const addTracker = (trackerNode) => {
+                if (!trackerNode) return;
+                const label = getDirectChildText(trackerNode, "label");
+                if (!label) return;
+
+                const value = getDirectChildText(trackerNode, "value") || getDirectChildText(trackerNode, "formula");
+                const max = getDirectChildText(trackerNode, "formula");
+                const key = `${label}::${value}::${max}`;
+                if (seen.has(key)) return;
+                seen.add(key);
+
+                trackers.push({ label, value, max });
+            };
+
+            charNode.querySelectorAll(":scope > tracker, :scope > race > tracker, :scope > background > tracker, :scope > class > tracker").forEach(addTracker);
+
+            charNode.querySelectorAll(":scope > class").forEach((classNode, index) => {
+                const classLevel = classInfos[index]?.level || 1;
+                classNode.querySelectorAll(":scope > autolevel").forEach(autolevelNode => {
+                    const autolevel = parseIntSafe(getDirectChildText(autolevelNode, "level") || "1", 1);
+                    if (autolevel <= classLevel) {
+                        autolevelNode.querySelectorAll(":scope > tracker").forEach(addTracker);
+                    }
+                });
+            });
+
+            return trackers;
+        }
+
+        function collectSheetDetails(charNode, activeFeatures) {
+            const details = {
+                armor: [],
+                weapons: [],
+                tools: [],
+                languages: []
+            };
+            const seen = {
+                armor: new Set(),
+                weapons: new Set(),
+                tools: new Set(),
+                languages: new Set()
+            };
+
+            const addUnique = (type, value) => {
+                const normalized = (value || "").trim();
+                if (!normalized || /^none$/i.test(normalized) || seen[type].has(normalized.toLowerCase())) return;
+                seen[type].add(normalized.toLowerCase());
+                details[type].push(normalized);
+            };
+
+            charNode.querySelectorAll(":scope > class").forEach(classNode => {
+                getDirectChildText(classNode, "armor").split(/\s*,\s*/).forEach(value => addUnique("armor", value));
+                getDirectChildText(classNode, "weapons").split(/\s*,\s*/).forEach(value => addUnique("weapons", value));
+                getDirectChildText(classNode, "tools").split(/\s*,\s*/).forEach(value => addUnique("tools", value));
+            });
+
+            charNode.querySelectorAll("race > mod, background > mod, class > mod").forEach(modNode => {
+                const name = getDirectChildText(modNode, "name");
+                const toolMatch = name.match(/^(.*?)\s*\((Tool Proficiency)\)$/i);
+                if (toolMatch) {
+                    addUnique("tools", toolMatch[1]);
+                }
+            });
+
+            activeFeatures
+                .filter(({ featureNode }) => getDirectChildText(featureNode, "name").trim().toLowerCase() === "languages")
+                .forEach(({ featureNode }) => {
+                    const text = cleanFeatureText(Array.from(featureNode.querySelectorAll(":scope > text")).map(textNode => textNode.textContent.trim()).filter(Boolean).join(" "));
+                    const match = text.match(/(?:speak,\s*read,\s*and\s*write|speak and understand|speak)\s+([^.!?]+)/i);
+                    if (!match) return;
+
+                    match[1]
+                        .split(/\s*,\s*|\s+and\s+/i)
+                        .map(value => value.replace(/\bcommon\b/i, "Common").trim())
+                        .filter(value => value && !/\bchoice\b/i.test(value))
+                        .forEach(value => addUnique("languages", value));
+                });
+
+            return details;
+        }
+
+        function renderSheetDetails(details) {
+            const lines = [];
+            if (details.armor.length > 0) lines.push(`Armor: ${details.armor.join(", ")}`);
+            if (details.weapons.length > 0) lines.push(`Weapons: ${details.weapons.join(", ")}`);
+            if (details.tools.length > 0) lines.push(`Tools: ${details.tools.join(", ")}`);
+            if (details.languages.length > 0) lines.push(`Languages: ${details.languages.join(", ")}`);
+            document.getElementById('profLanguages').value = lines.join("\n");
+        }
+
         function parseFC5XML(xmlText, fileName = "") {
             try {
                 const parser = new DOMParser();
@@ -260,6 +353,7 @@ const SKILLS_MASTER = [
                     document.getElementById(`mod-${s}`).textContent = calcMod(statsMap[s]);
                 });
                 const activeFeatures = collectActiveFeatures(charNode, classInfos);
+                const trackers = collectTrackers(charNode, classInfos);
 
                 // Race & Background - use direct child selectors to avoid grabbing character <name>
                 const raceNode = charNode.querySelector("race");
@@ -269,7 +363,8 @@ const SKILLS_MASTER = [
                 document.getElementById('charBackground').value = backgroundNode?.querySelector("name")?.textContent.trim() || getText("background") || "";
 
                 // Proficiency Bonus based on 5e Level table
-                const profBonusNum = Math.floor((totalLevel - 1) / 4) + 2;
+                const profBonusFromXml = parseIntSafe(getDirectChildText(charNode, "profbonus") || getDirectChildText(charNode, "proficiencyBonus") || getDirectChildText(charNode, "proficiencybonus"), 0);
+                const profBonusNum = profBonusFromXml > 0 ? profBonusFromXml : Math.floor((totalLevel - 1) / 4) + 2;
                 document.getElementById('profBonus').value = `+${profBonusNum}`;
 
                 // HP - FC5 XML uses <hp> for current and <hpmax> for max (lowercase tags)
@@ -285,12 +380,13 @@ const SKILLS_MASTER = [
                 document.getElementById('speedVal').value = speedVal.endsWith("ft") ? speedVal : `${speedVal} ft`;
 
                 // Calculate AC from Equipped Items or FC5 tag
-                let acVal = getText("ac");
-                if (!acVal) {
+                let acVal = parseIntSafe(getDirectChildText(charNode, "ac"), 0);
+                if (acVal <= 0) {
                     const dexMod = Math.floor((statsMap.dex - 10) / 2);
-                    const conMod = Math.floor((statsMap.con - 10) / 2);
-                    const hasUnarmoredDefense = activeFeatures.some(({ featureNode }) => getDirectChildText(featureNode, "name") === "Unarmored Defense");
-                    acVal = hasUnarmoredDefense ? 10 + dexMod + conMod : 10 + dexMod;
+                    const itemArmorValues = Array.from(charNode.querySelectorAll(":scope > item"))
+                        .map(itemNode => parseIntSafe(getDirectChildText(itemNode, "ac"), -1))
+                        .filter(value => value > 0);
+                    acVal = itemArmorValues.length > 0 ? Math.max(...itemArmorValues) : 10 + dexMod;
                 }
                 document.getElementById('acVal').value = acVal;
 
@@ -359,10 +455,13 @@ const SKILLS_MASTER = [
                 renderWeapons(charNode, statsMap, profBonusNum);
 
                 // Features & Feats (Page 2)
-                renderFeatures(activeFeatures);
+                renderFeatures(activeFeatures, trackers);
 
                 // Equipment
                 renderEquipment(charNode);
+
+                // Proficiencies & Languages
+                renderSheetDetails(collectSheetDetails(charNode, activeFeatures));
 
                 // Spells (Page 3)
                 renderSpells(charNode, statsMap, profBonusNum);
@@ -506,10 +605,26 @@ const SKILLS_MASTER = [
             });
         }
 
-        function renderFeatures(activeFeatures) {
+        function renderFeatures(activeFeatures, trackers = []) {
             const container = document.getElementById('featuresContainer');
             container.innerHTML = '';
             const seen = new Set();
+
+            trackers.forEach(({ label, value, max }) => {
+                const div = document.createElement('div');
+                div.className = "border-b border-zinc-200 pb-1.5";
+
+                const nameEl = document.createElement('span');
+                nameEl.className = "font-bold text-red-900";
+                nameEl.textContent = `${label}: `;
+
+                const textEl = document.createElement('span');
+                textEl.className = "text-zinc-700";
+                textEl.textContent = value && max && value !== max ? `${value} / ${max}` : (value || max || "");
+
+                div.append(nameEl, textEl);
+                container.appendChild(div);
+            });
 
             activeFeatures.forEach(({ featureNode, parentName }) => {
                 if (getDirectChildText(featureNode, "optional") === "1") return;
