@@ -427,15 +427,26 @@ const SKILLS_MASTER = [
             const strMod = Math.floor((statsMap.str - 10) / 2);
             const dexMod = Math.floor((statsMap.dex - 10) / 2);
 
-            // FC5 stores weapons either as <weapon> tags or as equipped <item> tags
+            // FC5 stores weapons either as <attack> direct children, <weapon> tags, or equipped <item> tags
             const weapons = [];
-            
-            // Check <weapon> nodes
+
+            // Check <attack> direct children (primary FC5e format)
+            // Each <attack> has <name>, <atk>, and <dmg> children
+            charNode.querySelectorAll(":scope > attack").forEach(a => {
+                const name = a.querySelector("name")?.textContent.trim() || "Attack";
+                const atk = a.querySelector("atk")?.textContent.trim() || `+${Math.max(strMod, dexMod) + profBonus}`;
+                const dmg = a.querySelector("dmg")?.textContent.trim() || "1";
+                weapons.push({ name, atkBonus: atk, dmg });
+            });
+
+            // Check <weapon> nodes (legacy format)
             charNode.querySelectorAll("weapon").forEach(w => {
                 const name = w.querySelector("name")?.textContent || "Weapon";
                 const dmg = w.querySelector("damage")?.textContent || "1d6";
                 const atkBonus = w.querySelector("attack")?.getAttribute("bonus") || `+${Math.max(strMod, dexMod) + profBonus}`;
-                weapons.push({ name, atkBonus, dmg });
+                if (!weapons.some(x => x.name === name)) {
+                    weapons.push({ name, atkBonus, dmg });
+                }
             });
 
             // Check <item> nodes with weapon types or damage
