@@ -1,0 +1,113 @@
+body {
+            font-family: 'Noto Sans', sans-serif;
+            background-color: #18181b;
+            color: #18181b;
+        }
+
+        .dnd-font {
+            font-family: 'Cinzel', Georgia, serif;
+        }
+
+        /* 8.5" x 11" Standard Printable Page */
+        .sheet-page {
+            width: 8.5in;
+            min-height: 11in;
+            padding: 0.4in;
+            margin: 0 auto 2rem auto;
+            background: #ffffff;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            position: relative;
+            box-sizing: border-box;
+            border: 1px solid #d4d4d8;
+        }
+
+        /* Distinct D&D 5e Styling Elements */
+        .dnd-box {
+            border: 1.5px solid #7a2021;
+            border-radius: 6px;
+            background: #fdfbf7;
+        }
+
+        .dnd-header-box {
+            background-color: #7a2021;
+            color: #ffffff;
+            padding: 2px 6px;
+            font-family: 'Cinzel', serif;
+            font-weight: 700;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-radius: 4px 4px 0 0;
+        }
+
+        .stat-box {
+            border: 1.5px solid #7a2021;
+            border-radius: 8px;
+            text-align: center;
+            background: #fdfbf7;
+            position: relative;
+        }
+
+        .stat-mod {
+            border: 1.5px solid #7a2021;
+            border-radius: 50%;
+            background: #ffffff;
+            width: 34px;
+            height: 28px;
+            margin: -12px auto 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: #7a2021;
+        }
+
+        .bubble {
+            width: 10px;
+            height: 10px;
+            border: 1.2px solid #7a2021;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 4px;
+            flex-shrink: 0;
+        }
+
+        .bubble.filled {
+            background-color: #7a2021;
+        }
+
+        .bubble.expertise {
+            background-color: #7a2021;
+            box-shadow: 0 0 0 2px #fdfbf7, 0 0 0 3px #7a2021;
+        }
+
+        /* Drag and Drop Highlight */
+        .drag-over {
+            border-color: #ef4444 !important;
+            background-color: #27272a !important;
+        }
+
+        /* Print Media Styles - Crisp Vector PDF Export */
+        @media print {
+            body {
+                background: none !important;
+                padding: 0 !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .sheet-page {
+                box-shadow: none !important;
+                margin: 0 !important;
+                width: 100% !important;
+                height: 100vh !important;
+                page-break-after: always !important;
+                page-break-inside: avoid !important;
+                border: none !important;
+            }
+            @page {
+                size: letter portrait;
+                margin: 0;
+            }
+        }
