@@ -439,17 +439,24 @@ const SKILLS_MASTER = [
             });
 
             // Check <item> nodes with weapon types or damage
+            // FC5e character XML uses numeric type codes: 4=Simple Melee, 5=Martial Melee,
+            // 6=Simple Ranged, 7=Martial Ranged. Compendium-sourced items may use letter codes: M, R, W.
+            const WEAPON_NUMERIC_TYPES = new Set(["4", "5", "6", "7"]);
+            const RANGED_NUMERIC_TYPES = new Set(["6", "7"]);
             charNode.querySelectorAll("item").forEach(item => {
                 const type = item.querySelector("type")?.textContent;
                 const name = item.querySelector("name")?.textContent;
-                const dmg = item.querySelector("damage")?.textContent;
+                const dmg = item.querySelector("damage")?.textContent || item.querySelector("dmg1")?.textContent;
 
-                if (name && (type === "M" || type === "R" || type === "W" || dmg)) {
-                    const isFinesseOrRanged = type === "R" || name.toLowerCase().includes("bow") || name.toLowerCase().includes("finesse") || name.toLowerCase().includes("scimitar");
+                const isWeaponType = type === "M" || type === "R" || type === "W" || WEAPON_NUMERIC_TYPES.has(type);
+                if (name && (isWeaponType || dmg)) {
+                    const isFinesseOrRanged = type === "R" || RANGED_NUMERIC_TYPES.has(type) ||
+                        name.toLowerCase().includes("bow") || name.toLowerCase().includes("finesse") ||
+                        name.toLowerCase().includes("scimitar");
                     const mod = isFinesseOrRanged ? dexMod : strMod;
                     const atkBonus = `+${mod + profBonus}`;
                     const dmgText = dmg || (isFinesseOrRanged ? `1d6${mod>=0?'+'+mod:mod}` : `1d8${mod>=0?'+'+mod:mod}`);
-                    
+
                     if (!weapons.some(w => w.name === name)) {
                         weapons.push({ name, atkBonus, dmg: dmgText });
                     }
@@ -457,7 +464,8 @@ const SKILLS_MASTER = [
             });
 
             if (getDirectChildText(charNode, "unarmed") === "1" && !weapons.some(w => w.name === "Unarmed Strike")) {
-                weapons.push({ name: "Unarmed Strike", atkBonus: `+${strMod + profBonus}`, dmg: "1 B" });
+                const unarmedDmg = `1d4${strMod >= 0 ? '+' + strMod : strMod} B`;
+                weapons.push({ name: "Unarmed Strike", atkBonus: `+${strMod + profBonus}`, dmg: unarmedDmg });
             }
 
             weapons.forEach(w => {
