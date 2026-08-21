@@ -8,10 +8,10 @@ body {
             font-family: 'Cinzel', Georgia, serif;
         }
 
-        /* 8.5" x 11" Standard Printable Page */
+        /* A4 Standard Printable Page */
         .sheet-page {
-            width: 8.5in;
-            min-height: 11in;
+            width: 210mm;
+            min-height: 297mm;
             padding: 0.4in;
             margin: 0 auto 2rem auto;
             background: #ffffff;
@@ -103,14 +103,14 @@ body {
             .sheet-page {
                 box-shadow: none !important;
                 margin: 0 !important;
-                width: 100% !important;
-                height: 100vh !important;
+                width: 210mm !important;
+                height: 297mm !important;
                 page-break-after: always !important;
                 page-break-inside: avoid !important;
                 border: none !important;
             }
             @page {
-                size: letter portrait;
+                size: A4 portrait;
                 margin: 0;
             }
         }

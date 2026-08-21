@@ -289,10 +289,10 @@ const SKILLS_MASTER = [
                 document.getElementById('acVal').value = acVal;
 
                 // Parse Proficiencies & Skills from XML <proficiency> and <saving-throw> tags.
-                // FC5e newer format encodes proficiencies as numeric IDs:
-                //   IDs 0-5  → saving throw stat index (0=STR, 1=DEX, 2=CON, 3=INT, 4=WIS, 5=CHA)
-                //   IDs 100+ → skill proficiency (ID - 100 = index into SKILLS_MASTER alphabetical list)
-                // Older formats use plain text values and are handled as a fallback.
+                // FC5e format encodes skill proficiencies as numeric IDs (0–17) that map directly
+                // to the alphabetical SKILLS_MASTER list (0=Acrobatics … 17=Survival).
+                // Saving throw proficiencies are stored in separate <saving-throw> tags.
+                // Some older exports use plain text skill names and are handled as a fallback.
                 const profSkillSet = new Set();
                 const profSaveSet = new Set();
 
@@ -300,13 +300,17 @@ const SKILLS_MASTER = [
                     const val = p.textContent.trim();
                     const num = parseInt(val);
                     if (!isNaN(num) && String(num) === val) {
-                        const skillIdx = num - 100;
-                        if (skillIdx >= 0 && skillIdx < SKILLS_MASTER.length) {
-                            profSkillSet.add(SKILLS_MASTER[skillIdx].name.toLowerCase());
-                        } else if (num >= 0 && num <= 5) {
-                            profSaveSet.add(STATS_MASTER[num]);
+                        // Direct skill index (0–17)
+                        if (num >= 0 && num < SKILLS_MASTER.length) {
+                            profSkillSet.add(SKILLS_MASTER[num].name.toLowerCase());
+                        } else {
+                            // Legacy fallback: some exports used a 100-based offset
+                            const skillIdx = num - 100;
+                            if (skillIdx >= 0 && skillIdx < SKILLS_MASTER.length) {
+                                profSkillSet.add(SKILLS_MASTER[skillIdx].name.toLowerCase());
+                            }
                         }
-                    } else {
+                    } else if (val) {
                         profSkillSet.add(val.toLowerCase());
                     }
                 });
