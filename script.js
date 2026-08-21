@@ -404,14 +404,18 @@ const SKILLS_MASTER = [
                 const profSkillSet = new Set();
                 const profSaveSet = new Set();
 
-                const skillProfNodes = [
-                    ...getDirectChildrenByTag(charNode, "proficiency"),
-                    ...getDirectChildrenByTag(charNode, "proficiencies").flatMap(node => getDirectChildrenByTag(node, "proficiency"))
-                ];
+                const proficiencyParents = [
+                    charNode,
+                    raceNode,
+                    backgroundNode,
+                    ...Array.from(classNodes),
+                    ...getDirectChildrenByTag(charNode, "proficiencies")
+                ].filter(Boolean);
+                const skillProfNodes = proficiencyParents.flatMap(node => getDirectChildrenByTag(node, "proficiency"));
                 skillProfNodes.forEach(p => {
                     const val = p.textContent.trim();
-                    const num = parseInt(val);
-                    if (!isNaN(num) && String(num) === val) {
+                    if (/^-?\d+$/.test(val)) {
+                        const num = parseInt(val, 10);
                         // Numbers 0–5 are saving throw indices (STR=0, DEX=1, CON=2, INT=3, WIS=4, CHA=5)
                         if (num >= 0 && num < STATS_MASTER.length) {
                             profSaveSet.add(STATS_MASTER[num]);
@@ -423,7 +427,10 @@ const SKILLS_MASTER = [
                             }
                         }
                     } else if (val) {
-                        profSkillSet.add(val.toLowerCase());
+                        val.split(/[,;]+/)
+                            .map(v => v.trim().toLowerCase())
+                            .filter(Boolean)
+                            .forEach(v => profSkillSet.add(v));
                     }
                 });
 
