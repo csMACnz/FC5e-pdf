@@ -91,12 +91,22 @@ const SKILLS_MASTER = [
         function shouldIncludeFeature(name, text, parentName = "") {
             const normalizedName = (name || "").trim().toLowerCase();
             if (!normalizedName) return false;
-            if (["description", "origin", "suggested characteristics"].includes(normalizedName)) return false;
+            if ([
+                "description",
+                "origin",
+                "suggested characteristics",
+                "ability score increase",
+                "age",
+                "alignment",
+                "size",
+                "speed",
+                "languages"
+            ].includes(normalizedName)) return false;
             if (normalizedName === (parentName || "").trim().toLowerCase()) return false;
             if (normalizedName.startsWith("creating ") || normalizedName.startsWith("starting ") || normalizedName.startsWith("multiclass ")) return false;
 
-            const previewText = cleanFeatureText(text).slice(0, 240);
-            return /^feature:/i.test(name) || /\b(you|your|while|when|if)\b/i.test(previewText);
+            const previewText = cleanFeatureText(text).split(/[.!?]/)[0].slice(0, 160);
+            return /^feature:/i.test(name) || /\b(you|your|while you|when you|you can|you have|you gain)\b/i.test(previewText);
         }
 
         function collectActiveFeatures(charNode, classInfos) {
@@ -548,7 +558,9 @@ const SKILLS_MASTER = [
             }
 
             page3.style.display = "flex";
-            const spellAbilityIndex = parseIntSafe(getDirectChildText(charNode, "spellAbility"), -1);
+            const spellAbilityIndex = Array.from(charNode.querySelectorAll(":scope > spellAbility, :scope > class > spellAbility, :scope > race > spellAbility, :scope > background > spellAbility"))
+                .map(node => parseIntSafe(node.textContent.trim(), -1))
+                .find(index => index >= 0 && index < STATS_MASTER.length);
             const spellAbility = SPELL_ABILITY_MAP[spellAbilityIndex] || "WIS";
             const statKey = STATS_MASTER[spellAbilityIndex] || "wis";
             const spellMod = Math.floor(((statsMap[statKey] || 10) - 10) / 2);
