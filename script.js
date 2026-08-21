@@ -20,6 +20,7 @@ const SKILLS_MASTER = [
         ];
 
         const STATS_MASTER = ["str", "dex", "con", "int", "wis", "cha"];
+        const SPELL_ABILITY_MAP = ["STR", "DEX", "CON", "INT", "WIS", "CHA"];
 
         // Drag and Drop setup
         const dropZone = document.body;
@@ -68,6 +69,94 @@ const SKILLS_MASTER = [
             const num = parseInt(score) || 10;
             const mod = Math.floor((num - 10) / 2);
             return mod >= 0 ? `+${mod}` : `${mod}`;
+        }
+
+        function parseIntSafe(value, fallback = 0) {
+            const num = parseInt(value, 10);
+            return Number.isNaN(num) ? fallback : num;
+        }
+
+        function getDirectChildText(parent, tagName) {
+            return parent?.querySelector(`:scope > ${tagName}`)?.textContent.trim() || "";
+        }
+
+        function cleanFeatureText(text) {
+            return (text || "")
+                .replace(/\s*Source:[\s\S]*$/i, "")
+                .replace(/\s*[•●▪]\s*/g, " • ")
+                .replace(/\s+/g, " ")
+                .trim();
+        }
+
+        function shouldIncludeFeature(name, text, parentName = "") {
+            const normalizedName = (name || "").trim().toLowerCase();
+            if (!normalizedName) return false;
+            if (["description", "origin", "suggested characteristics"].includes(normalizedName)) return false;
+            if (normalizedName === (parentName || "").trim().toLowerCase()) return false;
+            if (normalizedName.startsWith("creating ") || normalizedName.startsWith("starting ") || normalizedName.startsWith("multiclass ")) return false;
+
+            const previewText = cleanFeatureText(text).slice(0, 240);
+            return /^feature:/i.test(name) || /\b(you|your|while|when|if)\b/i.test(previewText);
+        }
+
+        function collectActiveFeatures(charNode, classInfos) {
+            const activeFeatures = [];
+            const addFeaturesFromNode = (parentNode, parentName = "") => {
+                if (!parentNode) return;
+                parentNode.querySelectorAll(":scope > feat, :scope > feature").forEach(featureNode => {
+                    activeFeatures.push({ featureNode, parentName });
+                });
+            };
+
+            const raceNode = charNode.querySelector("race");
+            const backgroundNode = charNode.querySelector("background");
+            addFeaturesFromNode(raceNode, getDirectChildText(raceNode, "name"));
+            addFeaturesFromNode(backgroundNode, getDirectChildText(backgroundNode, "name"));
+
+            charNode.querySelectorAll(":scope > class").forEach((classNode, index) => {
+                const className = getDirectChildText(classNode, "name");
+                const classLevel = classInfos[index]?.level || 1;
+                addFeaturesFromNode(classNode, className);
+
+                classNode.querySelectorAll(":scope > autolevel").forEach(autolevelNode => {
+                    const autolevel = parseIntSafe(getDirectChildText(autolevelNode, "level") || "1", 1);
+                    if (autolevel <= classLevel) {
+                        addFeaturesFromNode(autolevelNode, className);
+                    }
+                });
+            });
+
+            return activeFeatures;
+        }
+
+        function collectAbilityMods(charNode, classInfos) {
+            const abilityMods = { str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 };
+            const applyMod = (modNode) => {
+                const category = getDirectChildText(modNode, "category");
+                if (category !== "1") return;
+
+                const statIndex = parseIntSafe(getDirectChildText(modNode, "type") || "0", 0);
+                const statKey = STATS_MASTER[statIndex];
+                const value = parseIntSafe(getDirectChildText(modNode, "value"), 0);
+
+                if (statKey && value) {
+                    abilityMods[statKey] += value;
+                }
+            };
+
+            charNode.querySelectorAll("race > mod, background > mod, class > mod").forEach(applyMod);
+
+            charNode.querySelectorAll(":scope > class").forEach((classNode, index) => {
+                const classLevel = classInfos[index]?.level || 1;
+                classNode.querySelectorAll(":scope > autolevel").forEach(autolevelNode => {
+                    const autolevel = parseIntSafe(getDirectChildText(autolevelNode, "level") || "1", 1);
+                    if (autolevel <= classLevel) {
+                        autolevelNode.querySelectorAll(":scope > feat > mod, :scope > feature > mod").forEach(applyMod);
+                    }
+                });
+            });
+
+            return abilityMods;
         }
 
         function parseFC5XML(xmlText, fileName = "") {
@@ -119,12 +208,6 @@ const SKILLS_MASTER = [
                     });
                 }
 
-                // Update UI Ability Scores & Mods
-                STATS_MASTER.forEach(s => {
-                    document.getElementById(`score-${s}`).value = statsMap[s];
-                    document.getElementById(`mod-${s}`).textContent = calcMod(statsMap[s]);
-                });
-
                 // Class & Levels
                 const classNodes = charNode.querySelectorAll("class");
                 let totalLevel = 0;
@@ -154,6 +237,14 @@ const SKILLS_MASTER = [
                 const classList = classInfos.map(c => `${c.name} ${c.level || (classInfos.length === 1 ? totalLevel : 1)}`);
                 document.getElementById('charClass').value = classList.length > 0 ? classList.join(" / ") : "";
 
+                const abilityMods = collectAbilityMods(charNode, classInfos);
+                STATS_MASTER.forEach(s => {
+                    statsMap[s] += abilityMods[s] || 0;
+                    document.getElementById(`score-${s}`).value = statsMap[s];
+                    document.getElementById(`mod-${s}`).textContent = calcMod(statsMap[s]);
+                });
+                const activeFeatures = collectActiveFeatures(charNode, classInfos);
+
                 // Race & Background - use direct child selectors to avoid grabbing character <name>
                 const raceNode = charNode.querySelector("race");
                 const backgroundNode = charNode.querySelector("background");
@@ -167,7 +258,7 @@ const SKILLS_MASTER = [
 
                 // HP - FC5 XML uses <hp> for current and <hpmax> for max (lowercase tags)
                 const hpMax = getText("hpmax") || getText("hpMax") || "";
-                const hpCurrent = getText("hp") || hpMax;
+                const hpCurrent = getText("hpCurrent") || getText("hp") || hpMax;
                 document.getElementById('hpMax').value = hpMax;
                 document.getElementById('hpCurrent').value = hpCurrent;
                 document.getElementById('hpTemp').value = getText("hpTemp") || getText("hptemp") || "0";
@@ -181,7 +272,9 @@ const SKILLS_MASTER = [
                 let acVal = getText("ac");
                 if (!acVal) {
                     const dexMod = Math.floor((statsMap.dex - 10) / 2);
-                    acVal = 10 + dexMod; // Base unarmored
+                    const conMod = Math.floor((statsMap.con - 10) / 2);
+                    const hasUnarmoredDefense = activeFeatures.some(({ featureNode }) => getDirectChildText(featureNode, "name") === "Unarmored Defense");
+                    acVal = hasUnarmoredDefense ? 10 + dexMod + conMod : 10 + dexMod;
                 }
                 document.getElementById('acVal').value = acVal;
 
@@ -246,7 +339,7 @@ const SKILLS_MASTER = [
                 renderWeapons(charNode, statsMap, profBonusNum);
 
                 // Features & Feats (Page 2)
-                renderFeatures(charNode);
+                renderFeatures(activeFeatures);
 
                 // Equipment
                 renderEquipment(charNode);
@@ -349,53 +442,58 @@ const SKILLS_MASTER = [
                 }
             });
 
-            // Default fallback if no weapons found in XML
-            if (weapons.length === 0) {
-                weapons.push({ name: "Longbow", atkBonus: `+${dexMod + profBonus}`, dmg: `1d8+${dexMod} Piercing` });
-                weapons.push({ name: "Shortsword", atkBonus: `+${dexMod + profBonus}`, dmg: `1d6+${dexMod} Piercing` });
+            if (getDirectChildText(charNode, "unarmed") === "1" && !weapons.some(w => w.name === "Unarmed Strike")) {
+                weapons.push({ name: "Unarmed Strike", atkBonus: `+${strMod + profBonus}`, dmg: "1 B" });
             }
 
             weapons.forEach(w => {
                 const tr = document.createElement('tr');
                 tr.className = "border-b border-zinc-200";
-                tr.innerHTML = `
-                    <td class="p-1 font-bold">${w.name}</td>
-                    <td class="p-1 font-bold text-center text-red-900">${w.atkBonus.startsWith('+')||w.atkBonus.startsWith('-')?w.atkBonus:'+'+w.atkBonus}</td>
-                    <td class="p-1 text-zinc-700">${w.dmg}</td>
-                `;
+                const nameCell = document.createElement('td');
+                nameCell.className = "p-1 font-bold";
+                nameCell.textContent = w.name;
+
+                const atkCell = document.createElement('td');
+                atkCell.className = "p-1 font-bold text-center text-red-900";
+                atkCell.textContent = w.atkBonus.startsWith('+') || w.atkBonus.startsWith('-') ? w.atkBonus : `+${w.atkBonus}`;
+
+                const dmgCell = document.createElement('td');
+                dmgCell.className = "p-1 text-zinc-700";
+                dmgCell.textContent = w.dmg;
+
+                tr.append(nameCell, atkCell, dmgCell);
                 tbody.appendChild(tr);
             });
         }
 
-        function renderFeatures(charNode) {
+        function renderFeatures(activeFeatures) {
             const container = document.getElementById('featuresContainer');
             container.innerHTML = '';
+            const seen = new Set();
 
-            // FC5 XML uses <feature> inside <class>, <race>, and <background> nodes
-            charNode.querySelectorAll("class feature, race feature, background feature, feature").forEach(f => {
-                const fName = f.querySelector("name")?.textContent.trim();
-                const fTextNodes = f.querySelectorAll("text");
-                const fText = Array.from(fTextNodes).map(t => t.textContent.trim()).filter(Boolean).join(" ");
+            activeFeatures.forEach(({ featureNode, parentName }) => {
+                if (getDirectChildText(featureNode, "optional") === "1") return;
 
-                if (fName) {
-                    const div = document.createElement('div');
-                    div.className = "border-b border-zinc-200 pb-1.5";
-                    div.innerHTML = `<span class="font-bold text-red-900">${fName}:</span> <span class="text-zinc-700">${fText}</span>`;
-                    container.appendChild(div);
-                }
-            });
+                const featureName = getDirectChildText(featureNode, "name");
+                const featureText = cleanFeatureText(Array.from(featureNode.querySelectorAll(":scope > text")).map(textNode => textNode.textContent.trim()).filter(Boolean).join(" "));
+                const featureKey = `${featureName}::${featureText}`;
 
-            // Also handle old-style <feat> if present
-            charNode.querySelectorAll("feat").forEach(f => {
-                const fName = f.querySelector("name")?.textContent.trim();
-                const fText = f.querySelector("text")?.textContent.trim();
+                if (!shouldIncludeFeature(featureName, featureText, parentName) || seen.has(featureKey)) return;
+                seen.add(featureKey);
 
-                if (fName && fText && fName !== "Description") {
-                    const div = document.createElement('div');
-                    div.className = "border-b border-zinc-200 pb-1.5";
-                    div.innerHTML = `<span class="font-bold text-red-900">${fName}:</span> <span class="text-zinc-700">${fText}</span>`;
-                    container.appendChild(div);
-                }
+                const div = document.createElement('div');
+                div.className = "border-b border-zinc-200 pb-1.5";
+
+                const nameEl = document.createElement('span');
+                nameEl.className = "font-bold text-red-900";
+                nameEl.textContent = `${featureName}: `;
+
+                const textEl = document.createElement('span');
+                textEl.className = "text-zinc-700";
+                textEl.textContent = featureText;
+
+                div.append(nameEl, textEl);
+                container.appendChild(div);
             });
 
             if (container.children.length === 0) {
@@ -407,12 +505,21 @@ const SKILLS_MASTER = [
             const items = [];
             charNode.querySelectorAll("item").forEach(i => {
                 const name = i.querySelector("name")?.textContent.trim();
-                const qty = i.querySelector("qty")?.textContent.trim() || "1";
+                const qty = i.querySelector("quantity")?.textContent.trim() || i.querySelector("qty")?.textContent.trim() || "1";
                 if (name) {
                     const qtyNum = parseInt(qty);
-                    items.push(qtyNum > 1 ? `${name} (x${qty})` : name);
+                    if (/gold\s*\(gp\)/i.test(name)) {
+                        items.push(`${qtyNum || qty} gp`);
+                    } else {
+                        items.push(qtyNum > 1 ? `${name} (x${qty})` : name);
+                    }
                 }
             });
+
+            const moneyValue = parseFloat(getDirectChildText(charNode, "money"));
+            if (!Number.isNaN(moneyValue) && !items.some(item => /\bgp\b/i.test(item))) {
+                items.push(`${Number.isInteger(moneyValue) ? moneyValue : moneyValue.toFixed(2)} gp`);
+            }
 
             if (items.length > 0) {
                 document.getElementById('equipmentList').value = items.join("\n");
@@ -422,37 +529,53 @@ const SKILLS_MASTER = [
         function renderSpells(charNode, statsMap, profBonus) {
             const spells = charNode.querySelectorAll("spell");
             const page3 = document.getElementById('page3');
+            const slotValues = (getDirectChildText(charNode, "slots") || "")
+                .split(",")
+                .map(value => parseIntSafe(value, 0))
+                .filter(value => !Number.isNaN(value));
+            const hasSpellData = spells.length > 0 || slotValues.some(value => value > 0);
 
-            // Set Spellcasting Ability stats (Default Wisdom for Ranger)
-            const wisMod = Math.floor((statsMap.wis - 10) / 2);
-            document.getElementById('spellAbility').value = "WIS";
-            document.getElementById('spellSaveDC').value = 8 + profBonus + wisMod;
-            document.getElementById('spellAttackBonus').value = `+${profBonus + wisMod}`;
+            ['spells0', 'spells1', 'spells2', 'spells3', 'spellsHigher'].forEach(id => {
+                document.getElementById(id).innerHTML = '';
+            });
 
-            if (spells.length > 0) {
-                page3.style.display = "flex";
-                ['spells0', 'spells1', 'spells2', 'spells3', 'spellsHigher'].forEach(id => {
-                    document.getElementById(id).innerHTML = '';
-                });
-
-                spells.forEach(sp => {
-                    const sName = sp.querySelector("name")?.textContent || "Spell";
-                    const sLevel = sp.querySelector("level")?.textContent || "0";
-
-                    const div = document.createElement('div');
-                    div.className = "flex items-center justify-between border-b border-zinc-100 py-0.5";
-                    div.innerHTML = `<span><span class="bubble"></span>${sName}</span>`;
-
-                    if (sLevel === "0") document.getElementById('spells0').appendChild(div);
-                    else if (sLevel === "1") document.getElementById('spells1').appendChild(div);
-                    else if (sLevel === "2") document.getElementById('spells2').appendChild(div);
-                    else if (sLevel === "3") document.getElementById('spells3').appendChild(div);
-                    else document.getElementById('spellsHigher').appendChild(div);
-                });
-            } else {
-                // If character has no spells, keep page 3 available but clean
-                page3.style.display = "flex";
+            if (!hasSpellData) {
+                page3.style.display = "none";
+                document.getElementById('spellAbility').value = "";
+                document.getElementById('spellSaveDC').value = "";
+                document.getElementById('spellAttackBonus').value = "";
+                return;
             }
+
+            page3.style.display = "flex";
+            const spellAbilityIndex = parseIntSafe(getDirectChildText(charNode, "spellAbility"), -1);
+            const spellAbility = SPELL_ABILITY_MAP[spellAbilityIndex] || "WIS";
+            const statKey = STATS_MASTER[spellAbilityIndex] || "wis";
+            const spellMod = Math.floor(((statsMap[statKey] || 10) - 10) / 2);
+
+            document.getElementById('spellAbility').value = spellAbility;
+            document.getElementById('spellSaveDC').value = 8 + profBonus + spellMod;
+            document.getElementById('spellAttackBonus').value = `+${profBonus + spellMod}`;
+
+            spells.forEach(sp => {
+                const sName = sp.querySelector("name")?.textContent || "Spell";
+                const sLevel = sp.querySelector("level")?.textContent || "0";
+
+                const div = document.createElement('div');
+                div.className = "flex items-center justify-between border-b border-zinc-100 py-0.5";
+
+                const textWrap = document.createElement('span');
+                const bubble = document.createElement('span');
+                bubble.className = "bubble";
+                textWrap.append(bubble, document.createTextNode(sName));
+                div.appendChild(textWrap);
+
+                if (sLevel === "0") document.getElementById('spells0').appendChild(div);
+                else if (sLevel === "1") document.getElementById('spells1').appendChild(div);
+                else if (sLevel === "2") document.getElementById('spells2').appendChild(div);
+                else if (sLevel === "3") document.getElementById('spells3').appendChild(div);
+                else document.getElementById('spellsHigher').appendChild(div);
+            });
         }
 
         function loadSampleCharacter() {

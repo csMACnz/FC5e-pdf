@@ -94,6 +94,9 @@ body {
                 background: none !important;
                 padding: 0 !important;
             }
+            textarea::placeholder {
+                color: transparent !important;
+            }
             .no-print {
                 display: none !important;
             }
