@@ -130,11 +130,16 @@ const SKILLS_MASTER = [
                 let totalLevel = 0;
                 let hitDiceStr = "";
 
+                // FC5e newer format stores hd as an index (0=d4,1=d6,2=d8,3=d10,4=d12)
+                const HD_INDEX_MAP = { "0": "4", "1": "6", "2": "8", "3": "10", "4": "12" };
+
                 const classInfos = [];
                 classNodes.forEach(cNode => {
                     const cName = cNode.querySelector(":scope > name")?.textContent.trim() || "";
                     const cLvl = parseInt(cNode.querySelector(":scope > level")?.textContent.trim()) || 0;
-                    const cHd = cNode.querySelector(":scope > hd")?.textContent.trim() || "8";
+                    const rawHd = cNode.querySelector(":scope > hd")?.textContent.trim() || "8";
+                    // Map index to die size if needed; otherwise use value directly
+                    const cHd = HD_INDEX_MAP[rawHd] || rawHd;
                     if (cName) {
                         classInfos.push({ name: cName, level: cLvl, hd: cHd });
                         totalLevel += cLvl;
@@ -142,7 +147,10 @@ const SKILLS_MASTER = [
                     }
                 });
 
-                if (totalLevel === 0) totalLevel = parseInt(getText("level")) || 1;
+                // Default to level 1 when no <level> is found in class nodes.
+                // Do NOT fall back to getText("level") as that picks up <level> tags
+                // inside <autolevel> sub-nodes and returns the wrong value.
+                if (totalLevel === 0) totalLevel = 1;
                 const classList = classInfos.map(c => `${c.name} ${c.level || (classInfos.length === 1 ? totalLevel : 1)}`);
                 document.getElementById('charClass').value = classList.length > 0 ? classList.join(" / ") : "";
 
@@ -177,12 +185,35 @@ const SKILLS_MASTER = [
                 }
                 document.getElementById('acVal').value = acVal;
 
-                // Parse Proficiencies & Skills from XML <proficiency> and <saving-throw> tags
-                // Collect all proficiency text from character, class, background, and race nodes
-                const allProfTexts = [];
-                charNode.querySelectorAll("proficiency").forEach(p => allProfTexts.push(p.textContent.toLowerCase()));
-                charNode.querySelectorAll("saving-throw").forEach(p => allProfTexts.push(p.textContent.toLowerCase()));
-                const profText = allProfTexts.join(", ");
+                // Parse Proficiencies & Skills from XML <proficiency> and <saving-throw> tags.
+                // FC5e newer format encodes proficiencies as numeric IDs:
+                //   IDs 0-5  → saving throw stat index (0=STR, 1=DEX, 2=CON, 3=INT, 4=WIS, 5=CHA)
+                //   IDs 100+ → skill proficiency (ID - 100 = index into SKILLS_MASTER alphabetical list)
+                // Older formats use plain text values and are handled as a fallback.
+                const profSkillSet = new Set();
+                const profSaveSet = new Set();
+
+                charNode.querySelectorAll("proficiency").forEach(p => {
+                    const val = p.textContent.trim();
+                    const num = parseInt(val);
+                    if (!isNaN(num) && String(num) === val) {
+                        const skillIdx = num - 100;
+                        if (skillIdx >= 0 && skillIdx < SKILLS_MASTER.length) {
+                            profSkillSet.add(SKILLS_MASTER[skillIdx].name.toLowerCase());
+                        } else if (num >= 0 && num <= 5) {
+                            profSaveSet.add(STATS_MASTER[num]);
+                        }
+                    } else {
+                        profSkillSet.add(val.toLowerCase());
+                    }
+                });
+
+                charNode.querySelectorAll("saving-throw").forEach(p => {
+                    profSaveSet.add(p.textContent.trim().toLowerCase());
+                });
+
+                // Build a flat text string for legacy callers (passive perception check etc.)
+                const profText = Array.from(profSkillSet).join(", ");
 
                 // Initiative
                 const dexMod = Math.floor((statsMap.dex - 10) / 2);
@@ -191,34 +222,25 @@ const SKILLS_MASTER = [
                 // Hit Dice - built from class hd values
                 document.getElementById('hitDice').value = hitDiceStr || `${totalLevel}d8`;
 
-                // Passive Perception - check structured proficiency text
+                // Passive Perception - check skill proficiency set
                 const wisMod = Math.floor((statsMap.wis - 10) / 2);
-                const isPerceptionProf = profText.includes("perception");
+                const isPerceptionProf = profSkillSet.has("perception");
                 const passivePerc = 10 + wisMod + (isPerceptionProf ? profBonusNum : 0);
                 document.getElementById('passivePerception').value = passivePerc;
 
-                // Saving Throws - parse from <saving-throw> tags or class <proficiency> for save keywords
+                // Saving Throws - resolved from profSaveSet (numeric IDs or text values)
                 const savesList = [];
-                const savingThrowText = charNode.querySelector("saving-throw")?.textContent.toLowerCase() || "";
-                // Also look in class proficiency for saving throws
-                let allClassProfText = "";
-                classNodes.forEach(cNode => {
-                    allClassProfText += (cNode.querySelector("proficiency")?.textContent || "") + ",";
-                });
-                const combinedSaveText = (savingThrowText + "," + allClassProfText).toLowerCase();
-
                 const statNames = { str: ["strength", "str"], dex: ["dexterity", "dex"], con: ["constitution", "con"], int: ["intelligence", "int"], wis: ["wisdom", "wis"], cha: ["charisma", "cha"] };
                 STATS_MASTER.forEach(s => {
-                    const aliases = statNames[s];
-                    if (aliases.some(a => combinedSaveText.includes(a))) {
+                    if (profSaveSet.has(s) || Array.from(profSaveSet).some(v => statNames[s]?.includes(v))) {
                         savesList.push(s);
                     }
                 });
 
                 renderSaves(savesList, statsMap, profBonusNum);
 
-                // Skills - pass the structured proficiency text
-                renderSkills(profText, statsMap, profBonusNum);
+                // Skills - pass the resolved set of proficient skill names
+                renderSkills(profSkillSet, statsMap, profBonusNum);
 
                 // Weapons
                 renderWeapons(charNode, statsMap, profBonusNum);
@@ -264,13 +286,15 @@ const SKILLS_MASTER = [
             });
         }
 
-        function renderSkills(rawXmlText, statsMap, profBonus) {
+        function renderSkills(profSkillSet, statsMap, profBonus) {
             const container = document.getElementById('skillsList');
             container.innerHTML = '';
 
             SKILLS_MASTER.forEach(s => {
                 const sNameLower = s.name.toLowerCase();
-                const isProf = rawXmlText.includes(sNameLower);
+                const isProf = profSkillSet instanceof Set
+                    ? profSkillSet.has(sNameLower)
+                    : profSkillSet.includes(sNameLower);
                 const statVal = statsMap[s.stat] || 10;
                 const mod = Math.floor((statVal - 10) / 2);
                 const total = isProf ? mod + profBonus : mod;
