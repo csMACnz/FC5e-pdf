@@ -398,7 +398,7 @@ const SKILLS_MASTER = [
                 const profSkillSet = new Set();
                 const profSaveSet = new Set();
 
-                charNode.querySelectorAll("proficiency").forEach(p => {
+                charNode.querySelectorAll(":scope > proficiency").forEach(p => {
                     const val = p.textContent.trim();
                     const num = parseInt(val);
                     if (!isNaN(num) && String(num) === val) {
@@ -417,7 +417,7 @@ const SKILLS_MASTER = [
                     }
                 });
 
-                charNode.querySelectorAll("saving-throw").forEach(p => {
+                charNode.querySelectorAll(":scope > saving-throw").forEach(p => {
                     profSaveSet.add(p.textContent.trim().toLowerCase());
                 });
 
