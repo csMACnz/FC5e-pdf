@@ -94,7 +94,8 @@ const SKILLS_MASTER = [
                 document.getElementById('p2CharName').textContent = name;
                 document.getElementById('p3CharName').textContent = name;
 
-                // Abilities: FC5 stores as <abilities>16,17,14,13,14,11,</abilities>
+                // Abilities: FC5 stores either as <abilities>16,17,14,13,14,11,</abilities>
+                // or as individual tags <str>16</str> <dex>17</dex> etc.
                 const abilitiesStr = getText("abilities");
                 let statsMap = { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 };
 
@@ -111,7 +112,7 @@ const SKILLS_MASTER = [
                         };
                     }
                 } else {
-                    // Fallback to explicit tags if present
+                    // Fallback to explicit tags
                     STATS_MASTER.forEach(s => {
                         const val = parseInt(getText(s));
                         if (!isNaN(val)) statsMap[s] = val;
@@ -128,36 +129,43 @@ const SKILLS_MASTER = [
                 const classNodes = charNode.querySelectorAll("class");
                 let classList = [];
                 let totalLevel = 0;
+                let hitDiceStr = "";
 
                 classNodes.forEach(cNode => {
-                    const cName = getText("name", cNode);
-                    const cLvl = parseInt(getText("level", cNode)) || 1;
+                    const cName = cNode.querySelector("name")?.textContent.trim() || "";
+                    const cLvl = parseInt(cNode.querySelector("level")?.textContent.trim()) || 1;
+                    const cHd = cNode.querySelector("hd")?.textContent.trim() || "8";
                     if (cName) {
                         classList.push(`${cName} ${cLvl}`);
                         totalLevel += cLvl;
+                        hitDiceStr += (hitDiceStr ? " + " : "") + `${cLvl}d${cHd}`;
                     }
                 });
 
                 if (totalLevel === 0) totalLevel = parseInt(getText("level")) || 1;
-                document.getElementById('charClass').value = classList.length > 0 ? classList.join(" / ") : `Ranger ${totalLevel}`;
+                document.getElementById('charClass').value = classList.length > 0 ? classList.join(" / ") : "";
 
-                // Race & Background
-                const raceName = getText("name", charNode.querySelector("race")) || getText("race") || "Elf, Wood";
+                // Race & Background - use direct child selectors to avoid grabbing character <name>
+                const raceNode = charNode.querySelector("race");
+                const backgroundNode = charNode.querySelector("background");
+                const raceName = raceNode?.querySelector("name")?.textContent.trim() || getText("race") || "";
                 document.getElementById('charRace').value = raceName;
-                document.getElementById('charBackground').value = getText("name", charNode.querySelector("background")) || getText("background") || "Outlander";
+                document.getElementById('charBackground').value = backgroundNode?.querySelector("name")?.textContent.trim() || getText("background") || "";
 
                 // Proficiency Bonus based on 5e Level table
                 const profBonusNum = Math.floor((totalLevel - 1) / 4) + 2;
                 document.getElementById('profBonus').value = `+${profBonusNum}`;
 
-                // HP
-                const hpMax = getText("hpMax") || "14";
+                // HP - FC5 XML uses <hp> for current and <hpmax> for max (lowercase tags)
+                const hpMax = getText("hpmax") || getText("hpMax") || "";
+                const hpCurrent = getText("hp") || hpMax;
                 document.getElementById('hpMax').value = hpMax;
-                document.getElementById('hpCurrent').value = getText("hpCurrent") || hpMax;
-                document.getElementById('hpTemp').value = getText("hpTemp") || "0";
+                document.getElementById('hpCurrent').value = hpCurrent;
+                document.getElementById('hpTemp').value = getText("hpTemp") || getText("hptemp") || "0";
 
-                // AC & Speed
-                const speedVal = getText("speed", charNode.querySelector("race")) || getText("speed") || "35";
+                // AC & Speed - read speed from race node or top-level
+                const speedFromRace = raceNode?.querySelector("speed")?.textContent.trim() || "";
+                const speedVal = speedFromRace || getText("speed") || "30";
                 document.getElementById('speedVal').value = speedVal.endsWith("ft") ? speedVal : `${speedVal} ft`;
 
                 // Calculate AC from Equipped Items or FC5 tag
@@ -168,30 +176,47 @@ const SKILLS_MASTER = [
                 }
                 document.getElementById('acVal').value = acVal;
 
+                // Parse Proficiencies & Skills from XML <proficiency> and <saving-throw> tags
+                // Collect all proficiency text from character, class, background, and race nodes
+                const allProfTexts = [];
+                charNode.querySelectorAll("proficiency").forEach(p => allProfTexts.push(p.textContent.toLowerCase()));
+                charNode.querySelectorAll("saving-throw").forEach(p => allProfTexts.push(p.textContent.toLowerCase()));
+                const profText = allProfTexts.join(", ");
+
                 // Initiative
                 const dexMod = Math.floor((statsMap.dex - 10) / 2);
                 document.getElementById('initVal').value = dexMod >= 0 ? `+${dexMod}` : `${dexMod}`;
 
-                // Hit Dice
-                document.getElementById('hitDice').value = `${totalLevel}d10`;
+                // Hit Dice - built from class hd values
+                document.getElementById('hitDice').value = hitDiceStr || `${totalLevel}d8`;
 
-                // Passive Perception
+                // Passive Perception - check structured proficiency text
                 const wisMod = Math.floor((statsMap.wis - 10) / 2);
-                const isPerceptionProf = xmlText.toLowerCase().includes("perception");
+                const isPerceptionProf = profText.includes("perception");
                 const passivePerc = 10 + wisMod + (isPerceptionProf ? profBonusNum : 0);
                 document.getElementById('passivePerception').value = passivePerc;
 
-                // Parse Proficiencies & Skills
-                const profText = xmlText.toLowerCase();
-
-                // Saving Throws
+                // Saving Throws - parse from <saving-throw> tags or class <proficiency> for save keywords
                 const savesList = [];
-                if (profText.includes("strength save") || profText.includes("save>str") || classList.some(c => c.toLowerCase().includes("ranger") || c.toLowerCase().includes("fighter"))) savesList.push("str");
-                if (profText.includes("dexterity save") || profText.includes("save>dex") || classList.some(c => c.toLowerCase().includes("ranger") || c.toLowerCase().includes("rogue"))) savesList.push("dex");
+                const savingThrowText = charNode.querySelector("saving-throw")?.textContent.toLowerCase() || "";
+                // Also look in class proficiency for saving throws
+                let allClassProfText = "";
+                classNodes.forEach(cNode => {
+                    allClassProfText += (cNode.querySelector("proficiency")?.textContent || "") + ",";
+                });
+                const combinedSaveText = (savingThrowText + "," + allClassProfText).toLowerCase();
+
+                const statNames = { str: ["strength", "str"], dex: ["dexterity", "dex"], con: ["constitution", "con"], int: ["intelligence", "int"], wis: ["wisdom", "wis"], cha: ["charisma", "cha"] };
+                STATS_MASTER.forEach(s => {
+                    const aliases = statNames[s];
+                    if (aliases.some(a => combinedSaveText.includes(a))) {
+                        savesList.push(s);
+                    }
+                });
 
                 renderSaves(savesList, statsMap, profBonusNum);
 
-                // Skills
+                // Skills - pass the structured proficiency text
                 renderSkills(profText, statsMap, profBonusNum);
 
                 // Weapons
@@ -321,10 +346,24 @@ const SKILLS_MASTER = [
             const container = document.getElementById('featuresContainer');
             container.innerHTML = '';
 
-            const feats = charNode.querySelectorAll("feat");
-            feats.forEach(f => {
-                const fName = f.querySelector("name")?.textContent;
-                const fText = f.querySelector("text")?.textContent;
+            // FC5 XML uses <feature> inside <class>, <race>, and <background> nodes
+            charNode.querySelectorAll("class feature, race feature, background feature, feature").forEach(f => {
+                const fName = f.querySelector("name")?.textContent.trim();
+                const fTextNodes = f.querySelectorAll("text");
+                const fText = Array.from(fTextNodes).map(t => t.textContent.trim()).filter(Boolean).join(" ");
+
+                if (fName) {
+                    const div = document.createElement('div');
+                    div.className = "border-b border-zinc-200 pb-1.5";
+                    div.innerHTML = `<span class="font-bold text-red-900">${fName}:</span> <span class="text-zinc-700">${fText}</span>`;
+                    container.appendChild(div);
+                }
+            });
+
+            // Also handle old-style <feat> if present
+            charNode.querySelectorAll("feat").forEach(f => {
+                const fName = f.querySelector("name")?.textContent.trim();
+                const fText = f.querySelector("text")?.textContent.trim();
 
                 if (fName && fText && fName !== "Description") {
                     const div = document.createElement('div');
@@ -342,9 +381,12 @@ const SKILLS_MASTER = [
         function renderEquipment(charNode) {
             const items = [];
             charNode.querySelectorAll("item").forEach(i => {
-                const name = i.querySelector("name")?.textContent;
-                const qty = i.querySelector("qty")?.textContent || "1";
-                if (name) items.push(`${name} (x${qty})`);
+                const name = i.querySelector("name")?.textContent.trim();
+                const qty = i.querySelector("qty")?.textContent.trim() || "1";
+                if (name) {
+                    const qtyNum = parseInt(qty);
+                    items.push(qtyNum > 1 ? `${name} (x${qty})` : name);
+                }
             });
 
             if (items.length > 0) {
